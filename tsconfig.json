@@ -2,10 +2,10 @@
   "compilerOptions": {
     "strict": true,
     "noImplicitAny": false,
-    "target": "es2017",
+    "target": "es2022",
     "module": "nodenext",
     "moduleResolution": "nodenext",
-    "lib": ["es2015", "dom"],
+    "lib": ["es2022", "dom"],
     "outDir": "dist",
     "sourceMap": true,
     "esModuleInterop": true,

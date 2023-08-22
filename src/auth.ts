@@ -40,7 +40,7 @@ export async function validateApnsJwt(jwt: string) {
 export async function createClientJwt(clientKey: string) {
     const alg = 'HS256'
     const clientData = await getClientData(clientKey)
-    if (!clientData?.secret) {
+    if (!clientData || !clientData?.secret) {
         throw Error(`Can't make a JWT for secret-less client ${clientKey}`)
     }
     const privateKey = Buffer.from(clientData.secret, 'hex')
@@ -54,7 +54,7 @@ export async function createClientJwt(clientKey: string) {
 
 export async function validateClientJwt(jwt: string, clientKey: string) {
     const clientData = await getClientData(clientKey)
-    if (!clientData?.secret) {
+    if (!clientData || !clientData?.secret) {
         throw Error(`Can't validate a JWT for secret-less client ${clientKey}`)
     }
     const privateKey = Buffer.from(clientData.secret, 'hex')
@@ -73,8 +73,8 @@ export async function validateClientJwt(jwt: string, clientKey: string) {
 
 export async function refreshSecret(clientKey: string, force: boolean = false) {
     const clientData = await getClientData(clientKey)
-    if (!clientData?.token || !clientData?.tokenDate) {
-        throw Error(`Can't have a secret without a dated device token: ${clientData.id}`)
+    if (!clientData || !clientData?.token || !clientData?.tokenDate) {
+        throw Error(`Can't have a secret without a dated device token: ${clientKey}`)
     }
     if (force || !clientData?.secretDate || clientData.secretDate <= clientData.tokenDate) {
         clientData.secret = await makeNonce()

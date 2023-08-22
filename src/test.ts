@@ -55,7 +55,7 @@ async function testApns() {
     await rc.hDel(clientKey, ['secret', 'secretDate'])
     const updated = await sendSecretToClient(clientKey)
     const clientData = await getClientData(clientKey)
-    assert(clientData?.pushId)
+    assert(clientData && clientData?.pushId, `pushId wasn't recorded on client during update`)
     const requestId = `apnsRequestId:${clientData.pushId}`
     const requestData = await getApnsRequestData(requestId)
     server.closeAllConnections()

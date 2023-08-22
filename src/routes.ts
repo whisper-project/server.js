@@ -20,7 +20,7 @@ export async function apnsToken(req: express.Request, res: express.Response)  {
     const clientKey = `clientKey:${body.clientId}`
     const received: ClientData = { id: body.clientId, deviceId: body.deviceId, token: body.token, tokenDate: Date.now() }
     const existing = await getClientData(clientKey)
-    if (received.token !== existing?.token || received.deviceId !== existing?.deviceId) {
+    if (!existing || received.token !== existing?.token || received.deviceId !== existing?.deviceId) {
         await setClientData(clientKey, received)
     }
     res.status(204).send()

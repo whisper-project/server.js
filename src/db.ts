@@ -27,14 +27,11 @@ export interface ClientData {
     pushId?: string,
 }
 
-export async function getClientData(clientKey: string): Promise<ClientData> {
+export async function getClientData(clientKey: string) {
     const rc = await getDb()
     const existing: {[index:string]: string | number} = await rc.hGetAll(clientKey)
-    if (!existing) {
-        throw Error(`No data found for ${clientKey}`)
-    }
     if (!existing?.id) {
-        throw Error(`No id found in data for ${clientKey}: ${JSON.stringify(existing)}`)
+        return undefined
     }
     if (existing?.tokenDate === "string") {
         existing.tokenDate = parseInt(existing.tokenDate)
@@ -66,8 +63,8 @@ export interface ApnsRequestData {
 export async function getApnsRequestData(requestKey: string) {
     const db = await getDb()
     const existing: {[index:string]: string | number} = await db.hGetAll(requestKey)
-    if (!existing) {
-        throw Error(`No APNs request found for key ${requestKey}`)
+    if (!existing?.id) {
+        return undefined
     }
     if (typeof existing?.status === 'string') {
         existing.status = parseInt(existing.status)

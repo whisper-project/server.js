@@ -4,21 +4,25 @@
 
 import express from 'express'
 
-import {rc} from "./index.js";
+import {ClientData, getClientData, setClientData} from './db.js'
+import {sendSecretToClient} from './apns.js'
 
 export async function apnsToken(req: express.Request, res: express.Response)  {
-    const data = req.body
-    if (!data?.apnsToken || !data?.deviceId || !data?.clientId) {
-        console.log(`Missing key in posted apnsToken body: ${JSON.stringify(data)}`)
+    const body = req.body
+    if (!body?.token || !body?.deviceId || !body?.clientId) {
+        console.log(`Missing key in posted apnsToken body: ${JSON.stringify(body)}`)
         res.status(400).send({
             status: 'error',
-            reason: 'Posted apns data must include client id, device id, and apns token'
+            reason: 'Invalid post data'
         });
         return
     }
-    await rc.hSet(`clientId:${data.clientId}`, { deviceId: data.deviceId, apnsToken: data.apnsToken })
-    res.status(200).send({
-        status: 'success',
-        info: `Saved data for client clientId:${data.clientId}`
-    })
+    const clientKey = `clientKey:${body.clientId}`
+    const received: ClientData = { id: body.clientId, deviceId: body.deviceId, token: body.token, tokenDate: Date.now() }
+    const existing = await getClientData(clientKey)
+    if (received.token !== existing?.token || received.deviceId !== existing?.deviceId) {
+        await setClientData(clientKey, received)
+    }
+    res.status(204).send()
+    await sendSecretToClient(clientKey)
 }

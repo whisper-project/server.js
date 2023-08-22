@@ -15,11 +15,12 @@ export async function sendSecretToClient(clientKey: string) {
     }
     const server = config.apnsUrl
     const path = `/3/device/${clientData.token}`
+    const secret64 = Buffer.from(clientData.secret!, 'hex').toString('base64')
     const body = {
         "aps" : {
             "content-available" : 1
         },
-        "secret" : clientData.secret,
+        "secret" : secret64,
     }
     const response = await fetch(server + path, {
         method: "POST",

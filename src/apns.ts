@@ -9,7 +9,10 @@ import {getSettings} from './settings.js'
 
 export async function sendSecretToClient(clientKey: string) {
     const config = getSettings()
-    const clientData = await refreshSecret(clientKey)
+    const { didRefresh, clientData } = await refreshSecret(clientKey)
+    if (!didRefresh) {
+        return true
+    }
     const server = config.apnsUrl
     const path = `/3/device/${clientData.token}`
     const body = {
@@ -47,12 +50,10 @@ export async function sendSecretToClient(clientKey: string) {
     if (status >= 400) {
         const body = await response.json()
         requestData.reason = body.reason
-        if (status == 410) {
+        if (body?.timestamp) {
             requestData.timestamp = body.timestamp
         }
-        await setApnsRequestData(requestKey, requestData)
-        return false
     }
     await setApnsRequestData(requestKey, requestData)
-    return true
+    return status < 300
 }

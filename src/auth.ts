@@ -5,7 +5,7 @@
 import * as jose from 'jose'
 import {jwtVerify} from 'jose'
 import {randomBytes, randomUUID} from 'crypto';
-import {getClientData, setClientData} from './db.js'
+import {ClientData, getClientData, setClientData} from './db.js'
 import {getSettings} from './settings.js'
 
 export async function createApnsJwt() {
@@ -71,18 +71,25 @@ export async function validateClientJwt(jwt: string, clientKey: string) {
     }
 }
 
+export interface RefreshSecretResponse {
+    didRefresh: boolean,
+    clientData: ClientData
+}
+
 export async function refreshSecret(clientKey: string, force: boolean = false) {
+    let didRefresh = false
     const clientData = await getClientData(clientKey)
     if (!clientData || !clientData?.token || !clientData?.tokenDate) {
         throw Error(`Can't have a secret without a dated device token: ${clientKey}`)
     }
     if (force || !clientData?.secretDate || clientData.secretDate <= clientData.tokenDate) {
+        didRefresh = true
         clientData.secret = await makeNonce()
         clientData.secretDate = Date.now()
         clientData.pushId = randomUUID()
         await setClientData(clientKey, clientData)
     }
-    return clientData
+    return { didRefresh, clientData } as RefreshSecretResponse
 }
 
 export async function makeNonce() {

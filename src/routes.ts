@@ -18,12 +18,13 @@ export async function apnsToken(req: express.Request, res: express.Response)  {
         return
     }
     const clientKey = `clientKey:${body.clientId}`
-    const tokenHex = Buffer.from(body.deviceId, 'base64').toString('hex')
-    const received: ClientData = { id: body.clientId, deviceId: tokenHex, token: body.token, tokenDate: Date.now() }
+    const tokenHex = Buffer.from(body.token, 'base64').toString('hex')
+    const received: ClientData = { id: body.clientId, deviceId: body.deviceId, token: tokenHex, tokenDate: Date.now() }
     const existing = await getClientData(clientKey)
     if (!existing || received.token !== existing?.token || received.deviceId !== existing?.deviceId) {
         await setClientData(clientKey, received)
     }
+    console.log(`Received APNS token and device ID from client ${clientKey}`)
     res.status(204).send()
     await sendSecretToClient(clientKey)
 }

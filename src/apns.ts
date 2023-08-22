@@ -11,8 +11,10 @@ export async function sendSecretToClient(clientKey: string) {
     const config = getSettings()
     const { didRefresh, clientData } = await refreshSecret(clientKey)
     if (!didRefresh) {
+        console.log(`Client ${clientKey} already has a current secret`)
         return true
     }
+    console.log(`Pushing new secret to client ${clientKey}`)
     const server = config.apnsUrl
     const path = `/3/device/${clientData.token}`
     const secret64 = Buffer.from(clientData.secret!, 'hex').toString('base64')

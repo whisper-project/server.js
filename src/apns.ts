@@ -40,7 +40,7 @@ export async function sendSecretToClient(clientKey: string) {
         clientKey,
         status,
     }
-    const devId = response.headers['apns-unique-id']
+    const devId = response.headers.get('apns-unique-id')
     if (devId) {
         requestData.devId = devId
     }

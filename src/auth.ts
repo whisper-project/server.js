@@ -31,6 +31,7 @@ export async function validateApnsJwt(jwt: string) {
     }
     catch (err) {
         if (err instanceof jose.errors.JWSSignatureVerificationFailed) {
+            console.log(`Invalid APNS JWT: ${err}`)
             return false
         }
         throw err
@@ -65,6 +66,7 @@ export async function validateClientJwt(jwt: string, clientKey: string) {
     }
     catch (err) {
         if (err instanceof jose.errors.JWSSignatureVerificationFailed) {
+            console.log(`Invalid client JWT: ${err}`)
             return false
         }
         throw err

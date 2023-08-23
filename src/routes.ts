@@ -6,15 +6,13 @@ import express from 'express'
 
 import {ClientData, getClientData, setClientData} from './db.js'
 import {sendSecretToClient} from './apns.js'
+import {validateClientJwt} from './auth.js'
 
 export async function apnsToken(req: express.Request, res: express.Response)  {
     const body = req.body
     if (!body?.token || !body?.deviceId || !body?.clientId) {
         console.log(`Missing key in posted apnsToken body: ${JSON.stringify(body)}`)
-        res.status(400).send({
-            status: 'error',
-            reason: 'Invalid post data'
-        });
+        res.status(400).send({ status: 'error', reason: 'Invalid post data' });
         return
     }
     const clientKey = `clientKey:${body.clientId}`
@@ -27,4 +25,26 @@ export async function apnsToken(req: express.Request, res: express.Response)  {
     console.log(`Received APNS token and device ID from client ${clientKey}`)
     res.status(204).send()
     await sendSecretToClient(clientKey)
+}
+
+export async function pubSubTokenRequest(req: express.Request, res: express.Response) {
+    const body = req.body
+    if (!body?.clientId || !body?.activity) {
+        console.log(`Missing key in pub-sub token request body: ${JSON.stringify(body)}`)
+        res.status(400).send({ status: 'error', reason: 'Invalid post data' });
+        return
+    }
+    const clientKey = `clientKey:${body.clientId}`
+    const auth = req.header('Authorization')
+    if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
+        console.log(`Missing or invalid authorization header: ${auth}`)
+        res.status(403).send({ status: 'error', reason: 'Invalid authorization header' })
+        return
+    }
+    if (!validateClientJwt(auth.substring(7), clientKey)) {
+        console.log(`Client JWT failed to validate`)
+        res.status(403).send({ status: 'error', reason: 'Invalid authorization' })
+        return
+    }
+    res.status(200).send({ status: 'success', tokenRequest: 'this-is-your-mock-token-request'})
 }

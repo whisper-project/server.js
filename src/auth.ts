@@ -79,19 +79,19 @@ export interface RefreshSecretResponse {
 }
 
 export async function refreshSecret(clientKey: string, force: boolean = false) {
-    let didRefresh = false
     const clientData = await getClientData(clientKey)
     if (!clientData || !clientData?.token || !clientData?.tokenDate) {
         throw Error(`Can't have a secret without a dated device token: ${clientKey}`)
     }
     if (force || !clientData?.secretDate || clientData.secretDate <= clientData.tokenDate) {
-        didRefresh = true
+        console.log(`Issuing a new secret for client ${clientKey}`)
         clientData.secret = await makeNonce()
         clientData.secretDate = Date.now()
         clientData.pushId = randomUUID()
         await setClientData(clientKey, clientData)
+        return { didRefresh: true, clientData } as RefreshSecretResponse
     }
-    return { didRefresh, clientData } as RefreshSecretResponse
+    return { didRefresh: false, clientData } as RefreshSecretResponse
 }
 
 export async function makeNonce() {

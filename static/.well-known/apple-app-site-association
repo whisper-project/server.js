@@ -1,0 +1,20 @@
+{
+  "applinks": {
+      "details": [
+           {
+             "appIDs": [ "9BJ65G9LZ5.io.clickonetwo.whisper" ],
+             "components": [
+               {
+                  "/": "/subscribe/*",
+                  "comment": "Subscribe to a network-published whisperer."
+               },
+               {
+                  "/": "/web/*",
+                  "exclude": true,
+                  "comment": "View link on the web."
+               },
+             ]
+           }
+       ]
+   }
+}

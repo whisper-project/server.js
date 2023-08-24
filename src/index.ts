@@ -15,6 +15,7 @@ await getDb()
 
 express()
     .use(express.json())
+    .use(express.static('static'))
     .post('/apnsToken', asyncWrapper(apnsToken))
     .post('/pubSubTokenRequest', asyncWrapper(pubSubTokenRequest))
     .listen(PORT, () => console.log(`Listening on port ${PORT}`))

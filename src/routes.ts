@@ -29,7 +29,7 @@ export async function apnsToken(req: express.Request, res: express.Response)  {
 
 export async function pubSubTokenRequest(req: express.Request, res: express.Response) {
     const body = req.body
-    if (!body?.clientId || !body?.activity) {
+    if (!body?.clientId || !body?.activity || !body?.publisherId) {
         console.log(`Missing key in pub-sub token request body: ${JSON.stringify(body)}`)
         res.status(400).send({ status: 'error', reason: 'Invalid post data' });
         return
@@ -44,6 +44,21 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
     if (!validateClientJwt(auth.substring(7), clientKey)) {
         console.log(`Client JWT failed to validate`)
         res.status(403).send({ status: 'error', reason: 'Invalid authorization' })
+        return
+    }
+    if (body.activity !== "publish" && body.activity !== "subscribe") {
+        console.log(`Publishing and subscribing are the only allowed activities: ${JSON.stringify(body)}`)
+        res.status(400).send({ status: 'error', reason: 'Invalid activity' });
+        return
+    }
+    if (body.clientId === body.publisherId && body?.activity === "subscribe") {
+        console.log(`Self-publishing is not allowed: ${JSON.stringify(body)}`)
+        res.status(400).send({ status: 'error', reason: 'Self-publishing is not allowed' });
+        return
+    }
+    if (body.clientId !== body.publisherId && body?.activity !== "subscribe") {
+        console.log(`Publishing as someone else is not allowed: ${JSON.stringify(body)}`)
+        res.status(400).send({ status: 'error', reason: 'Impersonation is not allowed' });
         return
     }
     res.status(200).send({ status: 'success', tokenRequest: 'this-is-your-mock-token-request'})

@@ -35,6 +35,7 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
         return
     }
     const clientKey = `clientKey:${body.clientId}`
+    console.log(`Token request received from clientID ${clientKey}`)
     const auth = req.header('Authorization')
     if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
         console.log(`Missing or invalid authorization header: ${auth}`)
@@ -61,6 +62,6 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
         res.status(400).send({ status: 'error', reason: 'Impersonation is not allowed' });
         return
     }
-    console.log(`Issued token request to client ${clientKey}`)
+    console.log(`Issued mock token request to client ${clientKey}`)
     res.status(200).send({ status: 'success', tokenRequest: 'this-is-your-mock-token-request'})
 }

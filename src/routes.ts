@@ -61,5 +61,6 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
         res.status(400).send({ status: 'error', reason: 'Impersonation is not allowed' });
         return
     }
+    console.log(`Issued token request to client ${clientKey}`)
     res.status(200).send({ status: 'success', tokenRequest: 'this-is-your-mock-token-request'})
 }

@@ -65,10 +65,10 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
     if (body.activity == "publish") {
         const tokenRequest = await createAblyPublishTokenRequest(body.clientId)
         console.log(`Issued publish token request to client ${clientKey}`)
-        res.status(200).send({ status: 'success', tokenRequest: tokenRequest})
+        res.status(200).send({ status: 'success', tokenRequest: JSON.stringify(tokenRequest)})
     } else {
         const tokenRequest = await createAblySubscribeTokenRequest(body.clientId, body.publisherId)
         console.log(`Issued subscribe token request to client ${clientKey}`)
-        res.status(200).send({ status: 'success', tokenRequest: tokenRequest})
+        res.status(200).send({ status: 'success', tokenRequest: JSON.stringify(tokenRequest)})
     }
 }

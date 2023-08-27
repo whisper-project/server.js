@@ -3,6 +3,8 @@
 // See the LICENSE file for details.
 
 interface Settings {
+    ablyPublishKey: string
+    ablySubscribeKey: string
     apnsUrl: string
     apnsCredSecret: string
     apnsCredId: string
@@ -32,6 +34,7 @@ export function loadSettings(name: string = 'env') {
 
 function envSettings(): Settings {
     const fromEnv = {
+        ablyPublishKey: process.env['ABLY_PUBLISH_KEY'],
         apnsUrl: process.env['APNS_SERVER'],
         apnsCredSecret: process.env['APNS_CRED_SECRET_PKCS8'],
         apnsCredId: process.env['APNS_CRED_ID'],
@@ -48,6 +51,8 @@ function envSettings(): Settings {
 
 function testSettings(): Settings {
     return {
+        ablyPublishKey: 'xVLyHw.DGYdkQ:FtPUNIourpYSoZAIbeon0p_rJGtb5vO1j2OIzP3GMX8',
+        ablySubscribeKey: 'xVLyHw.DGYdkQ:FtPUNIourpYSoZAIbeon0p_rJGtb5vO1j2OIzP3GMX8',
         apnsUrl: 'http://localhost:2197',
         apnsCredSecret: '-----BEGIN PRIVATE KEY----- MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg5TL3GlhuHCFZe0L/ g+rt2ibfrgaGaiYl1/N2FAms0yehRANCAAT6nm9Bs5+HXOI2DRm9h1LtQxofxa1e lMN+WP8KFt9KQ/yKYohq4ZLtvdxfjoPobxPNm+VGkycP8zQMK3RAwJSu -----END PRIVATE KEY-----',
         apnsCredId: '89AB98CD89',

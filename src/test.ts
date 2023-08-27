@@ -7,7 +7,14 @@ import {randomUUID} from 'crypto'
 import express from 'express'
 
 
-import {createApnsJwt, createClientJwt, makeNonce, validateApnsJwt, validateClientJwt} from "./auth.js";
+import {
+    createAblyPublishTokenRequest, createAblySubscribeTokenRequest,
+    createApnsJwt,
+    createClientJwt,
+    makeNonce,
+    validateApnsJwt,
+    validateClientJwt
+} from "./auth.js";
 import {ClientData, getApnsRequestData, getClientData, getDb, setClientData} from './db.js'
 import {loadSettings} from './settings.js'
 import {sendSecretToClient} from './apns.js'
@@ -87,16 +94,30 @@ async function mockApnsRoute(req: express.Request, res: express.Response) {
     res.status(200).send()
 }
 
+async function testAbly() {
+    const clientKey1 = await createTestClient()
+    const clientData1 = await getClientData(clientKey1)
+    const tokenRequest1 = await createAblyPublishTokenRequest(clientData1!.id)
+    console.log(`Created publish token request: ${JSON.stringify(tokenRequest1)}`)
+    const clientKey2 = await createTestClient()
+    const clientData2 = await getClientData(clientKey2)
+    const tokenRequest2 = await createAblySubscribeTokenRequest(clientData2!.id, clientData1!.id)
+    console.log(`Created subscribe token request: ${JSON.stringify(tokenRequest2)}`)
+}
+
 async function testAll(...tests: string[]) {
     loadSettings('test')
     if (tests.length == 0) {
-        tests = ['jwt', 'apns']
+        tests = ['jwt', 'apns', 'ably']
     }
     if (tests.includes('jwt')) {
         await testJwt()
     }
     if (tests.includes('apns')) {
         await testApns()
+    }
+    if (tests.includes('ably')) {
+        await testAbly()
     }
     await deleteTestClients()
 }

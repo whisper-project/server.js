@@ -3,8 +3,9 @@
 // See the LICENSE file for details.
 
 import * as jose from 'jose'
-import {jwtVerify} from 'jose'
+import * as Ably from 'ably/promises.js'
 import {randomBytes, randomUUID} from 'crypto';
+
 import {ClientData, getClientData, setClientData} from './db.js'
 import {getSettings} from './settings.js'
 
@@ -26,7 +27,7 @@ export async function validateApnsJwt(jwt: string) {
     const privateKey = await jose.importPKCS8(config.apnsCredSecret, alg)
 
     try {
-        await jwtVerify(jwt, privateKey)
+        await jose.jwtVerify(jwt, privateKey)
         return true
     }
     catch (err) {
@@ -55,8 +56,8 @@ export async function createClientJwt(clientKey: string) {
 
 export async function validateClientJwt(jwt: string, clientKey: string) {
     const clientData = await getClientData(clientKey)
-    if (!clientData || !clientData?.secret) {
-        throw Error(`Can't validate a JWT for secret-less client ${clientKey}`)
+    if (!clientData || !clientData?.id || !clientData?.secret) {
+        throw Error(`Can't validate a JWT for an invalid client ${clientKey}`)
     }
     const privateKey = Buffer.from(clientData.secret, 'hex')
 
@@ -96,4 +97,28 @@ export async function refreshSecret(clientKey: string, force: boolean = false) {
 
 export async function makeNonce() {
     return randomBytes(32).toString('hex')
+}
+
+export async function createAblyPublishTokenRequest(clientId: string) {
+    const config = getSettings()
+    const ably = new Ably.Rest({ key: config.ablyPublishKey })
+    const tokenCaps = {}
+    tokenCaps[`whisper:${clientId}:*`] = ['publish', 'subscribe', 'presence']
+    const tokenParams = {
+        clientId,
+        capability: JSON.stringify(tokenCaps)
+    }
+    return await ably.auth.createTokenRequest(tokenParams)
+}
+
+export async function createAblySubscribeTokenRequest(clientId: string, publisherId: string) {
+    const config = getSettings()
+    const ably = new Ably.Rest({ key: config.ablyPublishKey })
+    const tokenCaps = {}
+    tokenCaps[`whisper:${publisherId}:*`] = ['subscribe']
+    const tokenParams = {
+        clientId,
+        capability: JSON.stringify(tokenCaps)
+    }
+    return await ably.auth.createTokenRequest(tokenParams)
 }

@@ -6,7 +6,7 @@ import express from 'express'
 
 import {ClientData, getClientData, setClientData} from './db.js'
 import {sendSecretToClient} from './apns.js'
-import {validateClientJwt} from './auth.js'
+import {createAblyPublishTokenRequest, createAblySubscribeTokenRequest, validateClientJwt} from './auth.js'
 
 export async function apnsToken(req: express.Request, res: express.Response)  {
     const body = req.body
@@ -35,14 +35,14 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
         return
     }
     const clientKey = `clientKey:${body.clientId}`
-    console.log(`Token request received from clientID ${clientKey}`)
+    console.log(`Token request received from client ${clientKey}`)
     const auth = req.header('Authorization')
     if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
         console.log(`Missing or invalid authorization header: ${auth}`)
         res.status(403).send({ status: 'error', reason: 'Invalid authorization header' })
         return
     }
-    if (!validateClientJwt(auth.substring(7), clientKey)) {
+    if (!await validateClientJwt(auth.substring(7), clientKey)) {
         console.log(`Client JWT failed to validate`)
         res.status(403).send({ status: 'error', reason: 'Invalid authorization' })
         return
@@ -62,6 +62,13 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
         res.status(400).send({ status: 'error', reason: 'Impersonation is not allowed' });
         return
     }
-    console.log(`Issued mock token request to client ${clientKey}`)
-    res.status(200).send({ status: 'success', tokenRequest: 'this-is-your-mock-token-request'})
+    if (body.activity == "publish") {
+        const tokenRequest = await createAblyPublishTokenRequest(body.clientId)
+        console.log(`Issued publish token request to client ${clientKey}`)
+        res.status(200).send({ status: 'success', tokenRequest: tokenRequest})
+    } else {
+        const tokenRequest = await createAblySubscribeTokenRequest(body.clientId, body.publisherId)
+        console.log(`Issued subscribe token request to client ${clientKey}`)
+        res.status(200).send({ status: 'success', tokenRequest: tokenRequest})
+    }
 }

@@ -23,13 +23,13 @@ express()
 type Handler = (req: express.Request, res: express.Response) => Promise<void>
 
 function asyncWrapper(handler: Handler) {
-    return async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    return async (req: express.Request, res: express.Response) => {
         try {
             await handler(req, res)
         }
         catch (error) {
             console.log(`Route handler produced an error: ${error}`)
-            next(error)
+            res.status(500).send({ status: 'error', reason: `Server error: ${error}`})
         }
     }
 }

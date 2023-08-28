@@ -103,7 +103,7 @@ export async function createAblyPublishTokenRequest(clientId: string) {
     const config = getSettings()
     const ably = new Ably.Rest({ key: config.ablyPublishKey })
     const tokenCaps = {}
-    tokenCaps[`whisper:${clientId}*`] = ['publish', 'subscribe', 'presence']
+    tokenCaps[`${clientId}:whisper`] = ['publish', 'subscribe', 'presence']
     const tokenParams = {
         clientId,
         capability: JSON.stringify(tokenCaps)
@@ -115,7 +115,7 @@ export async function createAblySubscribeTokenRequest(clientId: string, publishe
     const config = getSettings()
     const ably = new Ably.Rest({ key: config.ablyPublishKey })
     const tokenCaps = {}
-    tokenCaps[`whisper:${publisherId}*`] = ['publish', 'subscribe', 'presence']
+    tokenCaps[`${publisherId}:whisper`] = ['publish', 'subscribe', 'presence']
     const tokenParams = {
         clientId,
         capability: JSON.stringify(tokenCaps)

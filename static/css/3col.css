@@ -1,0 +1,23 @@
+/* Copyright 2023 Daniel C. Brotsky. All rights reserved. */
+/* Licensed under the GNU Affero General Public License v3. */
+/* See the LICENSE file for details. */
+
+/* container */
+.three-columns-grid {
+    display: grid;
+    grid-auto-rows: 1fr;
+    grid-template-columns: 1fr 2fr 1fr;
+}
+
+/* columns */
+.three-columns-grid > * {
+    padding:1rem;
+}
+
+h1 {
+    font-family: sans-serif;
+}
+
+p {
+    font-family: sans-serif;
+}

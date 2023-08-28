@@ -27,6 +27,20 @@ export async function apnsToken(req: express.Request, res: express.Response)  {
     await sendSecretToClient(clientKey)
 }
 
+export async function apnsReceivedNotification(req: express.Request, res: express.Response) {
+    const body = req.body
+    if (!body?.clientId) {
+        console.log(`Missing key in received notification post: ${JSON.stringify(body)}`)
+        res.status(400).send({ status: 'error', reason: 'Invalid post data' });
+        return
+    }
+    const clientKey = `clientKey:${body.clientId}`
+    const received: ClientData = { id: body.clientId, secretDate: Date.now() }
+    await setClientData(clientKey, received)
+    console.log(`Received confirmation of received notification from client ${clientKey}`)
+    res.status(204).send()
+}
+
 export async function pubSubTokenRequest(req: express.Request, res: express.Response) {
     const body = req.body
     if (!body?.clientId || !body?.activity || !body?.publisherId) {

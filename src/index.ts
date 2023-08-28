@@ -4,7 +4,7 @@
 
 import express from 'express'
 
-import {apnsToken, pubSubTokenRequest} from './routes.js';
+import {apnsReceivedNotification, apnsToken, pubSubTokenRequest} from './routes.js';
 import {getDb} from './db.js'
 import {loadSettings} from './settings.js'
 
@@ -17,6 +17,7 @@ express()
     .use(express.json())
     .use(express.static('static'))
     .post('/api/apnsToken', asyncWrapper(apnsToken))
+    .post('/api/apnsReceivedNotification', asyncWrapper(apnsReceivedNotification))
     .post('/api/pubSubTokenRequest', asyncWrapper(pubSubTokenRequest))
     .listen(PORT, () => console.log(`Listening on port ${PORT}`))
 

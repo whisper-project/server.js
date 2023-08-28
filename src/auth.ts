@@ -87,7 +87,6 @@ export async function refreshSecret(clientKey: string, force: boolean = false) {
     if (force || !clientData?.secretDate || clientData.secretDate <= clientData.tokenDate) {
         console.log(`Issuing a new secret for client ${clientKey}`)
         clientData.secret = await makeNonce()
-        clientData.secretDate = Date.now()
         clientData.pushId = randomUUID()
         await setClientData(clientKey, clientData)
         return { didRefresh: true, clientData } as RefreshSecretResponse

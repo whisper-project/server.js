@@ -21,7 +21,7 @@ import {sendSecretToClient} from './apns.js'
 
 async function createTestClient() {
     const uuid = randomUUID()
-    const clientKey = `testClientId:${uuid}`
+    const clientKey = `tcl:${uuid}`
     const clientData: ClientData = {
         id: uuid,
         deviceId: Math.random().toString(16).substring(2, 10),
@@ -34,10 +34,12 @@ async function createTestClient() {
     return clientKey
 }
 
-async function deleteTestClients() {
+async function deleteTestKeys() {
     const rc = await getDb()
-    const keys = await rc.keys('testClientId:*')
-    await rc.del(keys)
+    const keys = await rc.keys('t:*')
+    if (keys.length) {
+        await rc.del(keys)
+    }
 }
 
 async function testJwt() {
@@ -58,12 +60,14 @@ async function testJwt() {
 async function testApns() {
     const server = express().post('/3/device/:tokenId', mockApnsRoute).listen(2197)
     const clientKey = await createTestClient()
-    const rc = await getDb()
-    await rc.hDel(clientKey, ['secret', 'secretDate'])
+    let clientData = await getClientData(clientKey)
+    assert(clientData, 'test client has no data')
+    clientData.secretDate = 0
+    await setClientData(clientKey, clientData)
     const updated = await sendSecretToClient(clientKey)
-    const clientData = await getClientData(clientKey)
+    clientData = await getClientData(clientKey)
     assert(clientData && clientData?.pushId, `pushId wasn't recorded on client during update`)
-    const requestId = `apnsRequestId:${clientData.pushId}`
+    const requestId = `req:${clientData.pushId}`
     const requestData = await getApnsRequestData(requestId)
     server.closeAllConnections()
     server.removeAllListeners()
@@ -119,7 +123,7 @@ async function testAll(...tests: string[]) {
     if (tests.includes('ably')) {
         await testAbly()
     }
-    await deleteTestClients()
+    await deleteTestKeys()
 }
 
 testAll(...process.argv.slice(2))

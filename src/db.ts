@@ -6,12 +6,14 @@ import {createClient, RedisClientType} from 'redis'
 import {getSettings} from './settings.js'
 
 let loadedClient: RedisClientType | undefined
+let dbKeyPrefix: string = 'u:'
 
 export async function getDb() {
     if (loadedClient) {
         return loadedClient
     }
     const config = getSettings()
+    dbKeyPrefix = config.dbKeyPrefix
     loadedClient = createClient({ url: config.dbUrl })
     await loadedClient.connect()
     return loadedClient
@@ -29,7 +31,7 @@ export interface ClientData {
 
 export async function getClientData(clientKey: string) {
     const rc = await getDb()
-    const existing: {[index:string]: string | number} = await rc.hGetAll(clientKey)
+    const existing: {[index:string]: string | number} = await rc.hGetAll(dbKeyPrefix + clientKey)
     if (!existing?.id) {
         return undefined
     }
@@ -48,7 +50,7 @@ export async function setClientData(clientKey: string, clientData: ClientData) {
         update[key] = clientData[key].toString()
     }
     const rc = await getDb()
-    await rc.hSet(clientKey, update)
+    await rc.hSet(dbKeyPrefix + clientKey, update)
 }
 
 export interface ApnsRequestData {
@@ -62,7 +64,7 @@ export interface ApnsRequestData {
 
 export async function getApnsRequestData(requestKey: string) {
     const db = await getDb()
-    const existing: {[index:string]: string | number} = await db.hGetAll(requestKey)
+    const existing: {[index:string]: string | number} = await db.hGetAll(dbKeyPrefix + requestKey)
     if (!existing?.id) {
         return undefined
     }
@@ -78,5 +80,5 @@ export async function setApnsRequestData(requestKey: string, data: ApnsRequestDa
         update[key] = data[key].toString()
     }
     const rc = await getDb()
-    await rc.hSet(requestKey, update)
+    await rc.hSet(dbKeyPrefix + requestKey, update)
 }

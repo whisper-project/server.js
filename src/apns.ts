@@ -40,7 +40,7 @@ export async function sendSecretToClient(clientKey: string) {
         json: body,
     });
     const status = response.status
-    const requestKey = `apnsRequestId:${clientData.pushId!}`
+    const requestKey = `req:${clientData.pushId!}`
     const requestData: ApnsRequestData = {
         id: clientData.pushId!,
         clientKey,

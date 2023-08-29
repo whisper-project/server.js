@@ -10,6 +10,7 @@ interface Settings {
     apnsCredId: string
     apnsTeamId: string
     dbUrl: string
+    dbKeyPrefix: string
 }
 
 let loadedConfig: Settings | undefined
@@ -40,6 +41,7 @@ function envSettings(): Settings {
         apnsCredId: process.env['APNS_CRED_ID'],
         apnsTeamId: process.env['APNS_TEAM_ID'],
         dbUrl: process.env['REDISCLOUD_URL'],
+        dbKeyPrefix: process.env['DB_KEY_PREFIX']
     }
     for (const key in fromEnv) {
         if (!fromEnv[key]) {
@@ -57,6 +59,7 @@ function testSettings(): Settings {
         apnsCredSecret: '-----BEGIN PRIVATE KEY----- MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg5TL3GlhuHCFZe0L/ g+rt2ibfrgaGaiYl1/N2FAms0yehRANCAAT6nm9Bs5+HXOI2DRm9h1LtQxofxa1e lMN+WP8KFt9KQ/yKYohq4ZLtvdxfjoPobxPNm+VGkycP8zQMK3RAwJSu -----END PRIVATE KEY-----',
         apnsCredId: '89AB98CD89',
         apnsTeamId: '8CD8989AB9',
-        dbUrl: 'redis://'
+        dbUrl: 'redis://',
+        dbKeyPrefix: 't:'
     }
 }

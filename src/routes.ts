@@ -15,7 +15,7 @@ export async function apnsToken(req: express.Request, res: express.Response)  {
         res.status(400).send({ status: 'error', reason: 'Invalid post data' });
         return
     }
-    const clientKey = `clientKey:${body.clientId}`
+    const clientKey = `cli:${body.clientId}`
     const tokenHex = Buffer.from(body.token, 'base64').toString('hex')
     const received: ClientData = { id: body.clientId, deviceId: body.deviceId, token: tokenHex, tokenDate: Date.now() }
     const existing = await getClientData(clientKey)
@@ -34,7 +34,7 @@ export async function apnsReceivedNotification(req: express.Request, res: expres
         res.status(400).send({ status: 'error', reason: 'Invalid post data' });
         return
     }
-    const clientKey = `clientKey:${body.clientId}`
+    const clientKey = `cli:${body.clientId}`
     const received: ClientData = { id: body.clientId, secretDate: Date.now() }
     await setClientData(clientKey, received)
     console.log(`Received confirmation of received notification from client ${clientKey}`)
@@ -48,7 +48,7 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
         res.status(400).send({ status: 'error', reason: 'Invalid post data' });
         return
     }
-    const clientKey = `clientKey:${body.clientId}`
+    const clientKey = `cli:${body.clientId}`
     console.log(`Token request received from client ${clientKey}`)
     const auth = req.header('Authorization')
     if (!auth || !auth.toLowerCase().startsWith('bearer ')) {

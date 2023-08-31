@@ -47,8 +47,9 @@ export async function apnsReceivedNotification(req: express.Request, res: expres
         return
     }
     const clientKey = `cli:${body.clientId}`
+    const secretHex = Buffer.from(body.lastSecret, 'base64').toString('hex')
     // see refreshSecret for details of this logic
-    const received: ClientData = { id: body.clientId, secretDate: Date.now(), lastSecret: body.lastSecret }
+    const received: ClientData = { id: body.clientId, secretDate: Date.now(), lastSecret: secretHex }
     await setClientData(clientKey, received)
     console.log(`Received confirmation of received notification from client ${clientKey}`)
     res.status(204).send()

@@ -98,11 +98,11 @@ export async function refreshSecret(clientKey: string, force: boolean = false) {
         throw Error(`Can't have a secret without a dated device token: ${clientKey}`)
     }
     if (force || !clientData?.secret || !clientData?.secretDate) {
-        if (clientData?.secret) {
+        if (clientData?.secret && !clientData?.secretDate) {
             // a secret has been issued for this client, but it's never been received.
             // since these are often sent twice, it's important not to change it in case
             // there was simply a delay in responding to the notification.
-            console.log(`Reusing the existing secret for client ${clientKey}`)
+            console.log(`Reusing the sent-but-never-received secret for client ${clientKey}`)
         } else {
             console.log(`Issuing a new secret for client ${clientKey}`)
             clientData.secret = await makeNonce()

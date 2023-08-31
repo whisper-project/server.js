@@ -10,21 +10,33 @@ import {createAblyPublishTokenRequest, createAblySubscribeTokenRequest, validate
 
 export async function apnsToken(req: express.Request, res: express.Response)  {
     const body = req.body
-    if (!body?.token || !body?.deviceId || !body?.clientId) {
+    if (!body?.token || !body?.deviceId || !body?.clientId || !body?.lastSecret) {
         console.log(`Missing key in posted apnsToken body: ${JSON.stringify(body)}`)
         res.status(400).send({ status: 'error', reason: 'Invalid post data' });
         return
     }
     const clientKey = `cli:${body.clientId}`
     const tokenHex = Buffer.from(body.token, 'base64').toString('hex')
-    const received: ClientData = { id: body.clientId, deviceId: body.deviceId, token: tokenHex, tokenDate: Date.now() }
-    const existing = await getClientData(clientKey)
-    if (!existing || received.token !== existing?.token || received.deviceId !== existing?.deviceId) {
-        await setClientData(clientKey, received)
+    const secretHex = Buffer.from(body.lastSecret, 'base64').toString('hex')
+    const received: ClientData = {
+        id: body.clientId,
+        deviceId: body.deviceId,
+        token: tokenHex,
+        tokenDate: Date.now(),
+        lastSecret: secretHex
     }
-    console.log(`Received APNS token and device ID from client ${clientKey}`)
+    const existing = await getClientData(clientKey)
+    // see refreshSecret for explanation of logic around lastSecret
+    let clientChanged = !existing || received.lastSecret !== existing?.lastSecret
+    clientChanged = clientChanged || received.token !== existing?.token || received.deviceId !== existing?.deviceId
+    if (clientChanged) {
+        console.log(`Received APNS token from new or changed client ${clientKey}`)
+        await setClientData(clientKey, received)
+    } else {
+        console.log(`Received APNS token from unchanged client ${clientKey}`)
+    }
     res.status(204).send()
-    await sendSecretToClient(clientKey)
+    await sendSecretToClient(clientKey, clientChanged)
 }
 
 export async function apnsReceivedNotification(req: express.Request, res: express.Response) {
@@ -35,7 +47,10 @@ export async function apnsReceivedNotification(req: express.Request, res: expres
         return
     }
     const clientKey = `cli:${body.clientId}`
-    const received: ClientData = { id: body.clientId, secretDate: Date.now() }
+    // rotate the current secret to the last secret now that client has confirmed the new one
+    // see refreshSecret for details of this logic
+    const existing: ClientData = (await getClientData(clientKey))!
+    const received: ClientData = { id: body.clientId, secretDate: Date.now(), lastSecret: existing.secret }
     await setClientData(clientKey, received)
     console.log(`Received confirmation of received notification from client ${clientKey}`)
     res.status(204).send()

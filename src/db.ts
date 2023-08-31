@@ -24,6 +24,7 @@ export interface ClientData {
     deviceId?: string,
     token?: string,
     tokenDate?: number
+    lastSecret?: string
     secret?: string,
     secretDate?: number,
     pushId?: string,

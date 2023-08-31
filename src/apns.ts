@@ -7,9 +7,9 @@ import {createApnsJwt, refreshSecret} from './auth.js'
 import {ApnsRequestData, setApnsRequestData} from './db.js'
 import {getSettings} from './settings.js'
 
-export async function sendSecretToClient(clientKey: string) {
+export async function sendSecretToClient(clientKey: string, force: boolean = false) {
     const config = getSettings()
-    const { didRefresh, clientData } = await refreshSecret(clientKey)
+    const { didRefresh, clientData } = await refreshSecret(clientKey, force)
     if (!didRefresh) {
         console.log(`Client ${clientKey} already has a current secret`)
         return true

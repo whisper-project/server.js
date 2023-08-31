@@ -106,6 +106,7 @@ export async function refreshSecret(clientKey: string, force: boolean = false) {
         } else {
             console.log(`Issuing a new secret for client ${clientKey}`)
             clientData.secret = await makeNonce()
+            clientData.secretDate = 0
         }
         clientData.pushId = randomUUID()
         await setClientData(clientKey, clientData)

@@ -41,16 +41,14 @@ export async function apnsToken(req: express.Request, res: express.Response)  {
 
 export async function apnsReceivedNotification(req: express.Request, res: express.Response) {
     const body = req.body
-    if (!body?.clientId) {
+    if (!body?.clientId || !body?.lastSecret) {
         console.log(`Missing key in received notification post: ${JSON.stringify(body)}`)
         res.status(400).send({ status: 'error', reason: 'Invalid post data' });
         return
     }
     const clientKey = `cli:${body.clientId}`
-    // rotate the current secret to the last secret now that client has confirmed the new one
     // see refreshSecret for details of this logic
-    const existing: ClientData = (await getClientData(clientKey))!
-    const received: ClientData = { id: body.clientId, secretDate: Date.now(), lastSecret: existing.secret }
+    const received: ClientData = { id: body.clientId, secretDate: Date.now(), lastSecret: body.secret }
     await setClientData(clientKey, received)
     console.log(`Received confirmation of received notification from client ${clientKey}`)
     res.status(204).send()

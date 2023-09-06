@@ -1,6 +1,7 @@
 User-agent: *
 Disallow: /subscribe/
 Disallow: /api/
+Disallow: /listen/
 
 User-agent: *
 Allow: /

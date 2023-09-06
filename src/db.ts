@@ -4,6 +4,7 @@
 
 import {createClient, RedisClientType} from 'redis'
 import {getSettings} from './settings.js'
+import {makeNonce} from './auth.js'
 
 let loadedClient: RedisClientType | undefined
 let dbKeyPrefix: string = 'u:'
@@ -17,6 +18,18 @@ export async function getDb() {
     loadedClient = createClient({ url: config.dbUrl })
     await loadedClient.connect()
     return loadedClient
+}
+
+export async function getSessionKeys(doRotate = false) {
+    const rc = await getDb()
+    const sessionKey = dbKeyPrefix + 'sessionKeys'
+    let stored = await rc.lRange(sessionKey, 0, -1)
+    if (stored.length === 0 || doRotate) {
+        const secret = await makeNonce()
+        stored = [secret, ...stored]
+        await rc.lPush(sessionKey, secret)
+    }
+    return stored
 }
 
 export interface ClientData {

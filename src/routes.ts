@@ -7,6 +7,7 @@ import express from 'express'
 import {ClientData, getClientData, setClientData} from './db.js'
 import {sendSecretToClient} from './apns.js'
 import {createAblyPublishTokenRequest, createAblySubscribeTokenRequest, validateClientJwt} from './auth.js'
+import {randomUUID} from 'crypto'
 
 export async function apnsToken(req: express.Request, res: express.Response)  {
     const body = req.body
@@ -99,4 +100,32 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
         console.log(`Issued subscribe token request to client ${clientKey}`)
         res.status(200).send({ status: 'success', tokenRequest: JSON.stringify(tokenRequest)})
     }
+}
+
+export async function subscribeToPublisher(req: express.Request, res: express.Response) {
+    const publisherId = req.params?.publisherId
+    if (!publisherId || publisherId.match(/^[-0-9a-zA-Z]{36}$/) === null) {
+        res.setHeader('Location', '/subscribe404.html')
+        res.status(303).send()
+        return
+    }
+    let clientId = req?.session?.clientId
+    if (!clientId) {
+        clientId = randomUUID()
+    }
+    req.session = { publisherId, clientId }
+    const location = `/listen/index.html?clientId=${clientId}&publisherId=${publisherId}`
+    res.setHeader('Location', location)
+    res.status(303).send()
+}
+
+export async function subscribeTokenRequest(req: express.Request, res: express.Response) {
+    const clientId = req?.session?.clientId
+    const publisherId = req?.session?.publisherId
+    if (!clientId || !publisherId) {
+        res.sendStatus(403)
+        return
+    }
+    const tokenRequest = await createAblySubscribeTokenRequest(clientId, publisherId)
+    res.status(200).send(JSON.stringify(tokenRequest))
 }

@@ -9,8 +9,10 @@
     "outDir": "dist",
     "sourceMap": true,
     "esModuleInterop": true,
+    "jsx": "react"
   },
   "include": [
-    "src/**/*"
+    "src/*",
+    "listen/*"
   ],
 }

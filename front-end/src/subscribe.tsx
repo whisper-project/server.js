@@ -5,10 +5,12 @@
 import React, {useState} from 'react'
 import {configureAbly, useChannel, usePresence} from '@ably-labs/react-hooks'
 
+// @ts-ignore
 const urlParams = new URLSearchParams(window.location.search)
 const publisherId = urlParams.get('publisherId') || ''
 const clientId = urlParams.get('clientId') || ''
 if (!publisherId || !clientId) {
+    // @ts-ignore
     window.location.href = "/subscribe404.html"
 }
 
@@ -49,12 +51,16 @@ function PublisherName({ whisperer }) {
 }
 
 function ClientName({ client, onClientChange }) {
+    function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+        // @ts-ignore
+        onClientChange(e.target.value)
+    }
     return (
         <form>
             <input
                 type="text"
                 value={client}
-                onChange={ (e) => onClientChange(e.target.value) } />
+                onChange={ handleChange } />
         </form>
     )
 }
@@ -87,6 +93,7 @@ function receiveChunk(message, liveText, updateLiveText, pastText, updatePastTex
     if (message.name === clientId) {
         const [offset, text] = (message.data as string).split("|", 1)
         if (offset === "-21" && text === clientId) {
+            // @ts-ignore
             window.location.href = "connectionLost.html"
             return
         } else {

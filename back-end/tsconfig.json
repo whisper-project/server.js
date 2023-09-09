@@ -5,14 +5,12 @@
     "target": "es2022",
     "module": "nodenext",
     "moduleResolution": "nodenext",
-    "lib": ["es2022", "dom"],
-    "outDir": "dist",
+    "lib": ["es2022"],
     "sourceMap": true,
     "esModuleInterop": true,
-    "jsx": "react"
+    "outDir": "dist",
   },
   "include": [
-    "src/*",
-    "listen/*"
+    "src/**/*"
   ],
 }

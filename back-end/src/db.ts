@@ -41,6 +41,8 @@ export interface ClientData {
     secret?: string,
     secretDate?: number,
     pushId?: string,
+    userName?: string,
+    appInfo?: string,
 }
 
 export async function getClientData(clientKey: string) {

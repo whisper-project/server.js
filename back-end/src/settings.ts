@@ -2,6 +2,8 @@
 // Licensed under the GNU Affero General Public License v3.
 // See the LICENSE file for details.
 
+import { config } from 'dotenv'
+
 interface Settings {
     ablyPublishKey: string
     ablySubscribeKey: string
@@ -25,6 +27,7 @@ export function getSettings() {
 export function loadSettings(name: string = 'env') {
     name = name.toLowerCase()
     if (name === 'env') {
+        config()
         loadedConfig = envSettings()
     } else if (name === 'test') {
         loadedConfig = testSettings()

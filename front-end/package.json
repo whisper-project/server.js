@@ -1,0 +1,32 @@
+{
+  "name": "webapp",
+  "version": "1.0.0",
+  "description": "",
+  "targets": {
+    "default": {
+      "source": "src/index.html",
+      "distDir": "../back-end/public/listen",
+      "publicUrl": "/listen"
+    }
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "parcel src/index.html --open"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/react": "^18.2.21",
+    "@types/react-dom": "^18.2.7",
+    "buffer": "^6.0.3",
+    "parcel": "^2.9.3",
+    "process": "^0.11.10",
+    "typescript": "^5.2.2"
+  },
+  "dependencies": {
+    "@ably-labs/react-hooks": "^2.1.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}

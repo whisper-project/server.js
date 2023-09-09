@@ -24,17 +24,20 @@ export async function apnsToken(req: express.Request, res: express.Response)  {
         deviceId: body.deviceId,
         token: tokenHex,
         tokenDate: Date.now(),
-        lastSecret: secretHex
+        lastSecret: secretHex,
+        userName: body?.userName || '',
+        appInfo: body?.appInfo || '',
     }
     const existing = await getClientData(clientKey)
     // see refreshSecret for explanation of logic around lastSecret
     let clientChanged = !existing || received.lastSecret !== existing?.lastSecret
     clientChanged = clientChanged || received.token !== existing?.token || received.deviceId !== existing?.deviceId
+    const appInfo = body?.appInfo ? ` (${body.appInfo})` : ''
     if (clientChanged) {
-        console.log(`Received APNS token from new or changed client ${clientKey}`)
+        console.log(`Received APNS token from new or changed client ${clientKey}${appInfo}`)
         await setClientData(clientKey, received)
     } else {
-        console.log(`Received APNS token from unchanged client ${clientKey}`)
+        console.log(`Received APNS token from unchanged client ${clientKey}${appInfo}`)
     }
     res.status(204).send()
     await sendSecretToClient(clientKey, clientChanged)
@@ -65,6 +68,10 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
     }
     const clientKey = `cli:${body.clientId}`
     console.log(`Token request received from client ${clientKey}`)
+    if (body?.userName) {
+        const update: ClientData = { id: body.clientId, userName: body?.userName }
+        await setClientData(clientKey, update)
+    }
     const auth = req.header('Authorization')
     if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
         console.log(`Missing or invalid authorization header: ${auth}`)

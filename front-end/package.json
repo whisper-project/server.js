@@ -1,7 +1,4 @@
 {
-  "name": "webapp",
-  "version": "1.0.0",
-  "description": "",
   "targets": {
     "default": {
       "source": "src/index.html",
@@ -11,11 +8,8 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "parcel src/index.html --open"
+    "build": "parcel build"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "devDependencies": {
     "@types/react": "^18.2.21",
     "@types/react-dom": "^18.2.7",

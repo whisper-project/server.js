@@ -4,17 +4,18 @@
 
 import React, {useState} from 'react'
 import {configureAbly, useChannel, usePresence} from '@ably-labs/react-hooks'
+import {Types} from 'ably'
 
-// @ts-ignore
 const urlParams = new URLSearchParams(window.location.search)
 const publisherId = urlParams.get('publisherId') || ''
+const publisherName = urlParams.get('publisherName') || ''
 const clientId = urlParams.get('clientId') || ''
-if (!publisherId || !clientId) {
-    // @ts-ignore
+const clientName = urlParams.get('clientName') || ''
+if (!publisherId || !publisherName || !clientId || !clientName) {
     window.location.href = "/subscribe404.html"
 }
 
-configureAbly({authUrl: '/api/'})
+configureAbly({authUrl: '/api/subscribeTokenRequest'})
 const channelName = `${publisherId}:whisper`
 let resetInProgress: boolean = false
 
@@ -30,70 +31,77 @@ export default function ListenView() {
         channelName,
         client,
         (message) => receivePresence(
-            message, channel, updateLiveText, updatePastText, updateWhisperer))
+            message as Types.PresenceMessage, channel, updateLiveText, updatePastText, updateWhisperer))
 
     function updateClientEverywhere(name: string) {
         updateClient(name)
         updatePresence(name)
     }
+
     return (
         <>
             <PublisherName whisperer={whisperer}/>
-            <ClientName client={client} onClientChange={updateClientEverywhere} />
-            <LiveText liveText={liveText} />
-            <PastText pastText={pastText} />
+            <ClientName client={client} onClientChange={updateClientEverywhere}/>
+            <LiveText liveText={liveText}/>
+            <PastText pastText={pastText}/>
         </>
     )
 }
 
-function PublisherName({ whisperer }) {
-    return <h1>Listening to {whisperer}</h1>
+function PublisherName(props: { whisperer: string }) {
+    return <h1>Listening to {props.whisperer}</h1>
 }
 
-function ClientName({ client, onClientChange }) {
+function ClientName(props: { client: string, onClientChange: (e: string) => void }) {
     function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-        // @ts-ignore
-        onClientChange(e.target.value)
+        props.onClientChange(e.target.value)
     }
+
     return (
         <form>
             <input
+                id="listenerName"
                 type="text"
-                value={client}
-                onChange={ handleChange } />
+                value={props.client}
+                onChange={handleChange}/>
         </form>
     )
 }
 
-function LiveText({ liveText }) {
+function LiveText(props: { liveText: string }) {
     return (
         <form>
             <textarea
-                rows={ 4 }
-                cols={ 100 }>
-                {liveText}
+                id="liveText"
+                rows={4}
+                cols={2}>
+                {props.liveText}
             </textarea>
         </form>
     )
 }
 
-function PastText({ pastText }) {
+function PastText(props: { pastText: string }) {
     return (
         <form>
             <textarea
-                rows={ 25 }
-                cols={ 100 }>
-                {pastText}
+                id="pastText"
+                rows={25}
+                cols={100}>
+                {props.pastText}
             </textarea>
         </form>
     )
 }
 
-function receiveChunk(message, liveText, updateLiveText, pastText, updatePastText) {
+function receiveChunk(message: Types.Message,
+                      liveText: string,
+                      updateLiveText: React.Dispatch<React.SetStateAction<string>>,
+                      pastText: string,
+                      updatePastText: React.Dispatch<React.SetStateAction<string>>) {
     if (message.name === clientId) {
         const [offset, text] = (message.data as string).split("|", 1)
         if (offset === "-21" && text === clientId) {
-            // @ts-ignore
             window.location.href = "connectionLost.html"
             return
         } else {
@@ -106,7 +114,11 @@ function receiveChunk(message, liveText, updateLiveText, pastText, updatePastTex
     }
 }
 
-function receivePresence(message, channel, updateLiveText, updatePastText, updateWhisperer) {
+function receivePresence(message: Types.PresenceMessage,
+                         channel: Types.RealtimeChannelCallbacks,
+                         updateLiveText: React.Dispatch<React.SetStateAction<string>>,
+                         updatePastText: React.Dispatch<React.SetStateAction<string>>,
+                         updateWhisperer: { (value: React.SetStateAction<string>): void; (arg0: any): void }) {
     if (message.clientId === publisherId) {
         updateWhisperer(message.data)
         // auto-subscribe
@@ -114,7 +126,9 @@ function receivePresence(message, channel, updateLiveText, updatePastText, updat
     }
 }
 
-function readAllText(channel, updateLiveText, updatePastText) {
+function readAllText(channel: Types.RealtimeChannelCallbacks,
+                     updateLiveText: React.Dispatch<React.SetStateAction<string>>,
+                     updatePastText: React.Dispatch<React.SetStateAction<string>>) {
     if (resetInProgress) {
         // already reading all the text
         return
@@ -127,14 +141,20 @@ function readAllText(channel, updateLiveText, updatePastText) {
     channel.publish(publisherId, "-20|all")
 }
 
-function processChunk(chunk: string, liveText, updateLiveText, pastText, updatePastText) {
+function processChunk(chunk: string,
+                      liveText: string,
+                      updateLiveText: (arg0: string) => void,
+                      pastText: string, updatePastText: (arg0: string) => void) {
+    function isDiff(chunk: string): boolean {
+        return chunk.startsWith('-1') || !chunk.startsWith('-')
+    }
     if (chunk.startsWith('-9|')) {
         console.log("Received request to play sound")
     } else if (resetInProgress) {
         if (chunk.startsWith('-4|')) {
             console.log("Received reset acknowledgement from whisperer, clearing past text")
             updatePastText('')
-        } else if (!chunk.startsWith('-')) {
+        } else if (isDiff(chunk)) {
             console.log("Ignoring diff chunk because a read is in progress")
         } else if (chunk.startsWith('-1|') || chunk.startsWith('-2|')) {
             console.log("Prepending past line chunk")
@@ -145,11 +165,11 @@ function processChunk(chunk: string, liveText, updateLiveText, pastText, updateP
             resetInProgress = false
         }
     } else {
-        if (chunk.startsWith('-')) {
+        if (!isDiff(chunk)) {
             console.log("Ignoring non-diff chunk because no read in progress")
         } else if (chunk.startsWith('0|')) {
             updateLiveText(chunk.substring(3))
-        } else if (chunk.startsWith('-1|') || chunk.startsWith('-2|')) {
+        } else if (chunk.startsWith('-1|')) {
             console.log("Prepending live text to past line")
             updatePastText(liveText + '\n' + pastText)
             updateLiveText('')

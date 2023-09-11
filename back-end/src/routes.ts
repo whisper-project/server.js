@@ -176,9 +176,9 @@ export async function subscribeTokenRequest(req: express.Request, res: express.R
     const clientId = req?.session?.clientId
     const publisherId = req?.session?.publisherId
     if (!clientId || !publisherId) {
-        res.sendStatus(403)
+        res.sendStatus(403).send({ status: 'error', reason: 'no session to support authentication' })
         return
     }
     const tokenRequest = await createAblySubscribeTokenRequest(clientId, publisherId)
-    res.status(200).send(JSON.stringify(tokenRequest))
+    res.status(200).send(tokenRequest)
 }

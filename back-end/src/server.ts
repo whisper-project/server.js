@@ -24,7 +24,7 @@ const sessionMiddleware = cookieSession({ keys: await getSessionKeys() })
 
 express()
     .use(express.json())
-    .use(express.static('static'))
+    .use(express.static('public'))
     .post('/api/apnsToken', asyncWrapper(apnsToken))
     .post('/api/apnsReceivedNotification', asyncWrapper(apnsReceivedNotification))
     .post('/api/pubSubTokenRequest', asyncWrapper(pubSubTokenRequest))

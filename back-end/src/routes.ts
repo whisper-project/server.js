@@ -33,17 +33,29 @@ export async function apnsToken(req: express.Request, res: express.Response)  {
     // see refreshSecret for explanation of logic around lastSecret
     let clientChanged = false
     let changeReason = ""
-    if (!existing || received.lastSecret !== existing?.lastSecret) {
+    if (!existing) {
         clientChanged = true
         changeReason = "APNS token from new"
     }
-    if (!clientChanged && (received.token !== existing?.token || received.deviceId !== existing?.deviceId)) {
+    if (!clientChanged && received.lastSecret !== existing?.lastSecret) {
         clientChanged = true
-        changeReason = "new APNS or device token from existing"
+        changeReason = "unconfirmed secret from existing"
     }
-    if (!clientChanged && (received.userName !== existing?.userName || received.appInfo !== existing?.appInfo)) {
+    if (!clientChanged && received.token !== existing?.token) {
         clientChanged = true
-        changeReason = "new user or build data from existing"
+        changeReason = "new APNS token from existing"
+    }
+    if (!clientChanged && received.deviceId !== existing?.deviceId) {
+        clientChanged = true
+        changeReason = "new device ID from existing"
+    }
+    if (!clientChanged && received.userName !== existing?.userName) {
+        clientChanged = true
+        changeReason = "new user data from existing"
+    }
+    if (!clientChanged && received.appInfo !== existing?.appInfo) {
+        clientChanged = true
+        changeReason = "new build data from existing"
     }
     const appInfo = body?.appInfo ? ` (${body.appInfo})` : ''
     if (clientChanged) {

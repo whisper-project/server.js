@@ -20,8 +20,8 @@ const channelName = `${publisherId}:whisper`
 let resetInProgress: boolean = false
 
 export default function ListenView() {
-    const [whisperer, updateWhisperer] = useState(publisherId)
-    const [client, updateClient] = useState(clientId)
+    const [whisperer, updateWhisperer] = useState(publisherName)
+    const [client, updateClient] = useState(clientName)
     const [liveText, updateLiveText] = useState('This is where live text will appear')
     const [pastText, updatePastText] = useState('This is where past text will appear')
     const [channel] = useChannel(

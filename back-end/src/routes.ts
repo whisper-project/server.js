@@ -160,7 +160,7 @@ export async function subscribeToPublisher(req: express.Request, res: express.Re
     const publisherName = existing?.userName || 'Anonymous'
     let clientId = req?.session?.clientId
     if (!clientId) {
-        clientId = randomUUID()
+        clientId = randomUUID().toUpperCase()
     }
     clientKey = `cli:${clientId}`
     existing = await getClientData(clientKey)

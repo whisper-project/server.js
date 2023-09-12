@@ -4,7 +4,7 @@
 
 import React, {useState} from 'react'
 import {configureAbly, useChannel, usePresence} from '@ably-labs/react-hooks'
-import {Types} from 'ably'
+import {Types as Ably} from 'ably'
 
 const urlParams = new URLSearchParams(window.location.search)
 const publisherId = urlParams.get('publisherId') || ''
@@ -20,18 +20,19 @@ const channelName = `${publisherId}:whisper`
 let resetInProgress: boolean = false
 
 export default function ListenView() {
-    const [whisperer, updateWhisperer] = useState(publisherName)
+    const [whisperer, updateWhisperer] = useState(`Connecting to ${publisherName}...`)
     const [client, updateClient] = useState(clientName)
     const [liveText, updateLiveText] = useState('This is where live text will appear')
     const [pastText, updatePastText] = useState('This is where past text will appear')
     const [channel] = useChannel(
         channelName,
-        (message) => receiveChunk(message, liveText, updateLiveText, pastText, updatePastText))
+        (message) => receiveChunk(
+            message, channel, updateWhisperer, liveText, updateLiveText, pastText, updatePastText))
     const [_presence, updatePresence] = usePresence(
         channelName,
         client,
         (message) => receivePresence(
-            message as Types.PresenceMessage, channel, updateLiveText, updatePastText, updateWhisperer))
+            message as Ably.PresenceMessage, channel, updateLiveText, updatePastText, updateWhisperer))
 
     function updateClientEverywhere(name: string) {
         updateClient(name)
@@ -41,68 +42,80 @@ export default function ListenView() {
     return (
         <>
             <PublisherName whisperer={whisperer}/>
-            <ClientName client={client} onClientChange={updateClientEverywhere}/>
-            <LiveText liveText={liveText}/>
-            <PastText pastText={pastText}/>
+            <form>
+                <ClientName client={client} updateClient={updateClientEverywhere}/>
+                <LiveText liveText={liveText}/>
+                <PastText pastText={pastText}/>
+            </form>
         </>
     )
 }
 
 function PublisherName(props: { whisperer: string }) {
-    return <h1>Listening to {props.whisperer}</h1>
+    return <h1>{props.whisperer}</h1>
 }
 
-function ClientName(props: { client: string, onClientChange: (e: string) => void }) {
-    function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-        props.onClientChange(e.target.value)
+function ClientName(props: { client: string, updateClient: (s: string) => void }) {
+    function handleSubmit() {
+        const input = document.getElementById('listenerName')
+        if (input && input.textContent) {
+            props.updateClient(input.textContent)}
     }
 
     return (
-        <form>
+        <>
             <input
                 id="listenerName"
                 type="text"
                 value={props.client}
-                onChange={handleChange}/>
-        </form>
+            />
+            <button
+                id="submitButton"
+                type="submit"
+                onSubmit={handleSubmit}
+            >
+                Update
+            </button>
+        </>
     )
 }
 
 function LiveText(props: { liveText: string }) {
     return (
-        <form>
-            <textarea
-                id="liveText"
-                rows={4}
-                cols={2}>
-                {props.liveText}
-            </textarea>
-        </form>
+        <textarea
+            id="liveText"
+            rows={25}
+            readOnly={true}>
+            {props.liveText}
+        </textarea>
     )
 }
 
 function PastText(props: { pastText: string }) {
     return (
-        <form>
-            <textarea
-                id="pastText"
-                rows={25}
-                cols={100}>
-                {props.pastText}
-            </textarea>
-        </form>
+        <textarea
+            id="pastText"
+            rows={25}
+            readOnly={true}>
+            {props.pastText}
+        </textarea>
     )
 }
 
-function receiveChunk(message: Types.Message,
+function receiveChunk(message: Ably.Message,
+                      channel: Ably.RealtimeChannelCallbacks,
+                      updateWhisperer: React.Dispatch<React.SetStateAction<string>>,
                       liveText: string,
                       updateLiveText: React.Dispatch<React.SetStateAction<string>>,
                       pastText: string,
                       updatePastText: React.Dispatch<React.SetStateAction<string>>) {
-    if (message.name === clientId) {
+    console.log(`Received chunk from ${message.clientId}, topic ${message.name}: ${message.data}`)
+    if (message.name.toUpperCase() === clientId.toUpperCase()) {
         const [offset, text] = (message.data as string).split("|", 1)
-        if (offset === "-21" && text === clientId) {
-            window.location.href = "connectionLost.html"
+        if (offset === "-21" && text.toUpperCase() === clientId.toUpperCase()) {
+            console.log(`Whisperer is disconnecting.`)
+            channel.detach()
+            updateWhisperer(`Disconnected from ${publisherName}`)
             return
         } else {
             console.log('Ignoring unexpected chunk:', message.data)
@@ -114,19 +127,21 @@ function receiveChunk(message: Types.Message,
     }
 }
 
-function receivePresence(message: Types.PresenceMessage,
-                         channel: Types.RealtimeChannelCallbacks,
+function receivePresence(message: Ably.PresenceMessage,
+                         channel: Ably.RealtimeChannelCallbacks,
                          updateLiveText: React.Dispatch<React.SetStateAction<string>>,
                          updatePastText: React.Dispatch<React.SetStateAction<string>>,
-                         updateWhisperer: { (value: React.SetStateAction<string>): void; (arg0: any): void }) {
-    if (message.clientId === publisherId) {
-        updateWhisperer(message.data)
+                         updateWhisperer: React.Dispatch<React.SetStateAction<string>>) {
+    console.log(`Received presence message: ${message.clientId}, ${message.data}, ${message.action}`)
+    if (message.clientId.toUpperCase() === publisherId.toUpperCase()) {
+        console.log(`Received presence from Whisperer: ${message.data}, ${message.action}`)
+        updateWhisperer(`Connected to ${message.data}`)
         // auto-subscribe
         readAllText(channel, updateLiveText, updatePastText)
     }
 }
 
-function readAllText(channel: Types.RealtimeChannelCallbacks,
+function readAllText(channel: Ably.RealtimeChannelCallbacks,
                      updateLiveText: React.Dispatch<React.SetStateAction<string>>,
                      updatePastText: React.Dispatch<React.SetStateAction<string>>) {
     if (resetInProgress) {
@@ -143,8 +158,9 @@ function readAllText(channel: Types.RealtimeChannelCallbacks,
 
 function processChunk(chunk: string,
                       liveText: string,
-                      updateLiveText: (arg0: string) => void,
-                      pastText: string, updatePastText: (arg0: string) => void) {
+                      updateLiveText: React.Dispatch<React.SetStateAction<string>>,
+                      pastText: string,
+                      updatePastText: React.Dispatch<React.SetStateAction<string>>) {
     function isDiff(chunk: string): boolean {
         return chunk.startsWith('-1') || !chunk.startsWith('-')
     }

@@ -22087,7 +22087,7 @@ $parcel$exportWildcard($fc7dab5246cef5a7$exports, $79d1d236c59022a3$exports);
 
 const $aabe4dd59eb48f51$var$urlParams = new URLSearchParams(window.location.search);
 const $aabe4dd59eb48f51$var$publisherId = $aabe4dd59eb48f51$var$urlParams.get("publisherId") || "";
-const $aabe4dd59eb48f51$var$publisherName = $aabe4dd59eb48f51$var$urlParams.get("publisherName") || "";
+let $aabe4dd59eb48f51$var$publisherName = $aabe4dd59eb48f51$var$urlParams.get("publisherName") || "";
 const $aabe4dd59eb48f51$var$clientId = $aabe4dd59eb48f51$var$urlParams.get("clientId") || "";
 const $aabe4dd59eb48f51$var$clientName = $aabe4dd59eb48f51$var$urlParams.get("clientName") || "";
 if (!$aabe4dd59eb48f51$var$publisherId || !$aabe4dd59eb48f51$var$publisherName || !$aabe4dd59eb48f51$var$clientId || !$aabe4dd59eb48f51$var$clientName) window.location.href = "/subscribe404.html";
@@ -22096,13 +22096,19 @@ if (!$aabe4dd59eb48f51$var$publisherId || !$aabe4dd59eb48f51$var$publisherName |
 });
 const $aabe4dd59eb48f51$var$channelName = `${$aabe4dd59eb48f51$var$publisherId}:whisper`;
 let $aabe4dd59eb48f51$var$resetInProgress = false;
+const $aabe4dd59eb48f51$var$disconnectedLiveText = "This is where live text will appear";
+const $aabe4dd59eb48f51$var$disconnectedPastText = "This is where past text will appear";
 function $aabe4dd59eb48f51$export$2e2bcd8739ae039() {
     const [whisperer, updateWhisperer] = (0, $dZtnC.useState)(`Connecting to ${$aabe4dd59eb48f51$var$publisherName}...`);
     const [client, updateClient] = (0, $dZtnC.useState)($aabe4dd59eb48f51$var$clientName);
-    const [liveText, updateLiveText] = (0, $dZtnC.useState)("This is where live text will appear");
-    const [pastText, updatePastText] = (0, $dZtnC.useState)("This is where past text will appear");
+    const [liveText, updateLiveText] = (0, $dZtnC.useState)($aabe4dd59eb48f51$var$disconnectedLiveText);
+    const [pastText, updatePastText] = (0, $dZtnC.useState)($aabe4dd59eb48f51$var$disconnectedPastText);
     const [channel] = (0, $ee5486cf5f4bc1e1$exports.useChannel)($aabe4dd59eb48f51$var$channelName, (message)=>$aabe4dd59eb48f51$var$receiveChunk(message, channel, updateWhisperer, liveText, updateLiveText, pastText, updatePastText));
-    const [_presence, updatePresence] = (0, $79d1d236c59022a3$exports.usePresence)($aabe4dd59eb48f51$var$channelName, client, (message)=>$aabe4dd59eb48f51$var$receivePresence(message, channel, updateLiveText, updatePastText, updateWhisperer));
+    const [presence, updatePresence] = (0, $79d1d236c59022a3$exports.usePresence)($aabe4dd59eb48f51$var$channelName, client, (message)=>$aabe4dd59eb48f51$var$receivePresence(message, channel, updateLiveText, updatePastText, updateWhisperer));
+    if (presence.length > 0) {
+        console.log(`Processing ${presence.length} historical presence messages`);
+        for (const message of presence)$aabe4dd59eb48f51$var$receivePresence(message, channel, updateLiveText, updatePastText, updateWhisperer);
+    }
     function updateClientEverywhere(name) {
         updateClient(name);
         updatePresence(name);
@@ -22172,26 +22178,41 @@ function $aabe4dd59eb48f51$var$PastText(props) {
     });
 }
 function $aabe4dd59eb48f51$var$receiveChunk(message, channel, updateWhisperer, liveText, updateLiveText, pastText, updatePastText) {
-    console.log(`Received chunk from ${message.clientId}, topic ${message.name}: ${message.data}`);
     if (message.name.toUpperCase() === $aabe4dd59eb48f51$var$clientId.toUpperCase()) {
+        console.log(`Received chunk directed here: ${message.data}`);
         const [offset, text] = message.data.split("|", 1);
         if (offset === "-21" && text.toUpperCase() === $aabe4dd59eb48f51$var$clientId.toUpperCase()) {
-            console.log(`Whisperer is disconnecting.`);
+            console.log(`Whisperer is dropping this client`);
             channel.detach();
-            updateWhisperer(`Disconnected from ${$aabe4dd59eb48f51$var$publisherName}`);
+            updateWhisperer(`Dropped by ${$aabe4dd59eb48f51$var$publisherName}`);
             return;
         } else console.log("Ignoring unexpected chunk:", message.data);
     } else if (message.name === "all") $aabe4dd59eb48f51$var$processChunk(message.data, liveText, updateLiveText, pastText, updatePastText);
-    else console.log(`Ignoring chunk meant for other listener: ${message.name}`);
+    else if (message.clientId.toUpperCase() != $aabe4dd59eb48f51$var$publisherId.toUpperCase()) console.log(`Ignoring chunk from non-listener ${message.clientId}, topic ${message.name}: ${message.data}`);
+    else console.log(`Ignoring chunk with topic ${message.name}: ${message.data}`);
 }
 function $aabe4dd59eb48f51$var$receivePresence(message, channel, updateLiveText, updatePastText, updateWhisperer) {
-    console.log(`Received presence message: ${message.clientId}, ${message.data}, ${message.action}`);
     if (message.clientId.toUpperCase() === $aabe4dd59eb48f51$var$publisherId.toUpperCase()) {
         console.log(`Received presence from Whisperer: ${message.data}, ${message.action}`);
-        updateWhisperer(`Connected to ${message.data}`);
-        // auto-subscribe
-        $aabe4dd59eb48f51$var$readAllText(channel, updateLiveText, updatePastText);
-    }
+        if (message.action in [
+            "present",
+            "enter",
+            "update"
+        ]) {
+            $aabe4dd59eb48f51$var$publisherName = message.data;
+            updateWhisperer(`Connected to ${$aabe4dd59eb48f51$var$publisherName}`);
+            // auto-subscribe
+            $aabe4dd59eb48f51$var$readAllText(channel, updateLiveText, updatePastText);
+        } else if (message.action in [
+            "leave",
+            "absent"
+        ]) {
+            $aabe4dd59eb48f51$var$publisherName = message.data;
+            updateWhisperer(`Disconnected from ${$aabe4dd59eb48f51$var$publisherName}`);
+            updateLiveText($aabe4dd59eb48f51$var$disconnectedLiveText);
+            updateLiveText($aabe4dd59eb48f51$var$disconnectedPastText);
+        }
+    } else console.log(`Ignoring presence message: ${message.clientId}, ${message.data}, ${message.action}`);
 }
 function $aabe4dd59eb48f51$var$readAllText(channel, updateLiveText, updatePastText) {
     if ($aabe4dd59eb48f51$var$resetInProgress) // already reading all the text

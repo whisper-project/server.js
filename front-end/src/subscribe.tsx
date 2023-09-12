@@ -8,7 +8,7 @@ import {Types as Ably} from 'ably'
 
 const urlParams = new URLSearchParams(window.location.search)
 const publisherId = urlParams.get('publisherId') || ''
-const publisherName = urlParams.get('publisherName') || ''
+let publisherName = urlParams.get('publisherName') || ''
 const clientId = urlParams.get('clientId') || ''
 const clientName = urlParams.get('clientName') || ''
 if (!publisherId || !publisherName || !clientId || !clientName) {
@@ -18,21 +18,30 @@ if (!publisherId || !publisherName || !clientId || !clientName) {
 configureAbly({authUrl: '/api/subscribeTokenRequest'})
 const channelName = `${publisherId}:whisper`
 let resetInProgress: boolean = false
+const disconnectedLiveText = 'This is where live text will appear'
+const disconnectedPastText = 'This is where past text will appear'
 
 export default function ListenView() {
     const [whisperer, updateWhisperer] = useState(`Connecting to ${publisherName}...`)
     const [client, updateClient] = useState(clientName)
-    const [liveText, updateLiveText] = useState('This is where live text will appear')
-    const [pastText, updatePastText] = useState('This is where past text will appear')
+    const [liveText, updateLiveText] = useState(disconnectedLiveText)
+    const [pastText, updatePastText] = useState(disconnectedPastText)
     const [channel] = useChannel(
         channelName,
         (message) => receiveChunk(
             message, channel, updateWhisperer, liveText, updateLiveText, pastText, updatePastText))
-    const [_presence, updatePresence] = usePresence(
+    const [presence, updatePresence] = usePresence(
         channelName,
         client,
         (message) => receivePresence(
             message as Ably.PresenceMessage, channel, updateLiveText, updatePastText, updateWhisperer))
+    if (presence.length > 0) {
+        console.log(`Processing ${presence.length} historical presence messages`)
+        for (const message of presence) {
+            receivePresence(message as Ably.PresenceMessage, channel, updateLiveText, updatePastText, updateWhisperer)
+        }
+    }
+
 
     function updateClientEverywhere(name: string) {
         updateClient(name)
@@ -109,13 +118,13 @@ function receiveChunk(message: Ably.Message,
                       updateLiveText: React.Dispatch<React.SetStateAction<string>>,
                       pastText: string,
                       updatePastText: React.Dispatch<React.SetStateAction<string>>) {
-    console.log(`Received chunk from ${message.clientId}, topic ${message.name}: ${message.data}`)
     if (message.name.toUpperCase() === clientId.toUpperCase()) {
+        console.log(`Received chunk directed here: ${message.data}`)
         const [offset, text] = (message.data as string).split("|", 1)
         if (offset === "-21" && text.toUpperCase() === clientId.toUpperCase()) {
-            console.log(`Whisperer is disconnecting.`)
+            console.log(`Whisperer is dropping this client`)
             channel.detach()
-            updateWhisperer(`Disconnected from ${publisherName}`)
+            updateWhisperer(`Dropped by ${publisherName}`)
             return
         } else {
             console.log('Ignoring unexpected chunk:', message.data)
@@ -123,7 +132,11 @@ function receiveChunk(message: Ably.Message,
     } else if (message.name === 'all') {
         processChunk(message.data as string, liveText, updateLiveText, pastText, updatePastText)
     } else {
-        console.log(`Ignoring chunk meant for other listener: ${message.name}`)
+        if (message.clientId.toUpperCase() != publisherId.toUpperCase()) {
+            console.log(`Ignoring chunk from non-listener ${message.clientId}, topic ${message.name}: ${message.data}`)
+        } else {
+            console.log(`Ignoring chunk with topic ${message.name}: ${message.data}`)
+        }
     }
 }
 
@@ -132,12 +145,21 @@ function receivePresence(message: Ably.PresenceMessage,
                          updateLiveText: React.Dispatch<React.SetStateAction<string>>,
                          updatePastText: React.Dispatch<React.SetStateAction<string>>,
                          updateWhisperer: React.Dispatch<React.SetStateAction<string>>) {
-    console.log(`Received presence message: ${message.clientId}, ${message.data}, ${message.action}`)
     if (message.clientId.toUpperCase() === publisherId.toUpperCase()) {
         console.log(`Received presence from Whisperer: ${message.data}, ${message.action}`)
-        updateWhisperer(`Connected to ${message.data}`)
-        // auto-subscribe
-        readAllText(channel, updateLiveText, updatePastText)
+        if (message.action in ['present', 'enter', 'update']) {
+            publisherName = message.data
+            updateWhisperer(`Connected to ${publisherName}`)
+            // auto-subscribe
+            readAllText(channel, updateLiveText, updatePastText)
+        } else if (message.action in ['leave', 'absent']) {
+            publisherName = message.data
+            updateWhisperer(`Disconnected from ${publisherName}`)
+            updateLiveText(disconnectedLiveText)
+            updateLiveText(disconnectedPastText)
+        }
+    } else {
+        console.log(`Ignoring presence message: ${message.clientId}, ${message.data}, ${message.action}`)
     }
 }
 

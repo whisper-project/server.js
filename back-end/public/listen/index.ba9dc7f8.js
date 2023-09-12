@@ -22186,7 +22186,8 @@ function $aabe4dd59eb48f51$var$receiveChunk(message, channel, updateWhisperer, l
             console.log(`Whisperer is dropping this client`);
             channel.detach();
             updateWhisperer(`Dropped by ${$aabe4dd59eb48f51$var$publisherName}`);
-            return;
+            updateLiveText($aabe4dd59eb48f51$var$disconnectedLiveText);
+            updatePastText($aabe4dd59eb48f51$var$disconnectedPastText);
         } else console.log("Ignoring unexpected chunk:", message.data);
     } else if (message.name === "all") $aabe4dd59eb48f51$var$processChunk(message.data, liveText, updateLiveText, pastText, updatePastText);
     else if (message.clientId.toUpperCase() != $aabe4dd59eb48f51$var$publisherId.toUpperCase()) console.log(`Ignoring chunk from non-listener ${message.clientId}, topic ${message.name}: ${message.data}`);
@@ -22196,23 +22197,23 @@ function $aabe4dd59eb48f51$var$receivePresence(message, channel, updateLiveText,
     if (message.clientId.toUpperCase() == $aabe4dd59eb48f51$var$clientId.toUpperCase()) console.log(`Ignoring self presence message: ${message.action}, ${message.data}`);
     else if (message.clientId.toUpperCase() === $aabe4dd59eb48f51$var$publisherId.toUpperCase()) {
         console.log(`Received presence from Whisperer: ${message.action}, ${message.data}`);
-        if (message.action in [
+        if ([
             "present",
             "enter",
             "update"
-        ]) {
+        ].includes(message.action)) {
             $aabe4dd59eb48f51$var$publisherName = message.data;
             updateWhisperer(`Connected to ${$aabe4dd59eb48f51$var$publisherName}`);
             // auto-subscribe
             $aabe4dd59eb48f51$var$readAllText(channel, updateLiveText, updatePastText);
-        } else if (message.action in [
+        } else if ([
             "leave",
             "absent"
-        ]) {
+        ].includes(message.action)) {
             $aabe4dd59eb48f51$var$publisherName = message.data;
             updateWhisperer(`Disconnected from ${$aabe4dd59eb48f51$var$publisherName}`);
             updateLiveText($aabe4dd59eb48f51$var$disconnectedLiveText);
-            updateLiveText($aabe4dd59eb48f51$var$disconnectedPastText);
+            updatePastText($aabe4dd59eb48f51$var$disconnectedPastText);
         }
     } else console.log(`Ignoring presence message: ${message.clientId}, ${message.data}, ${message.action}`);
 }

@@ -127,7 +127,8 @@ function receiveChunk(message: Ably.Message,
             console.log(`Whisperer is dropping this client`)
             channel.detach()
             updateWhisperer(`Dropped by ${publisherName}`)
-            return
+            updateLiveText(disconnectedLiveText)
+            updatePastText(disconnectedPastText)
         } else {
             console.log('Ignoring unexpected chunk:', message.data)
         }
@@ -151,16 +152,16 @@ function receivePresence(message: Ably.PresenceMessage,
         console.log(`Ignoring self presence message: ${message.action}, ${message.data}`)
     } else if (message.clientId.toUpperCase() === publisherId.toUpperCase()) {
         console.log(`Received presence from Whisperer: ${message.action}, ${message.data}`)
-        if (message.action in ['present', 'enter', 'update']) {
+        if (['present', 'enter', 'update'].includes(message.action)) {
             publisherName = message.data
             updateWhisperer(`Connected to ${publisherName}`)
             // auto-subscribe
             readAllText(channel, updateLiveText, updatePastText)
-        } else if (message.action in ['leave', 'absent']) {
+        } else if (['leave', 'absent'].includes(message.action)) {
             publisherName = message.data
             updateWhisperer(`Disconnected from ${publisherName}`)
             updateLiveText(disconnectedLiveText)
-            updateLiveText(disconnectedPastText)
+            updatePastText(disconnectedPastText)
         }
     } else {
         console.log(`Ignoring presence message: ${message.clientId}, ${message.data}, ${message.action}`)

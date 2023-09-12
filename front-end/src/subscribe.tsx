@@ -18,6 +18,7 @@ if (!publisherId || !publisherName || !clientId || !clientName) {
 configureAbly({authUrl: '/api/subscribeTokenRequest'})
 const channelName = `${publisherId}:whisper`
 let resetInProgress: boolean = false
+let presenceMessagesProcessed = 0
 const disconnectedLiveText = 'This is where live text will appear'
 const disconnectedPastText = 'This is where past text will appear'
 
@@ -31,10 +32,12 @@ export default function ListenView() {
         (message) => receiveChunk(
             message, channel, updateWhisperer, liveText, updateLiveText, pastText, updatePastText))
     const [presence, updatePresence] = usePresence(channelName, client)
-    if (presence.length > 0) {
-        console.log(`Processing ${presence.length} presence messages`)
-        for (const message of presence) {
-            receivePresence(message as Ably.PresenceMessage, channel, updateLiveText, updatePastText, updateWhisperer)
+    if (presence.length > presenceMessagesProcessed) {
+        console.log(`Processing ${presence.length - presenceMessagesProcessed} presence messages`)
+        for (; presenceMessagesProcessed < presence.length; presenceMessagesProcessed++) {
+            receivePresence(
+                presence[presenceMessagesProcessed] as Ably.PresenceMessage,
+                channel, updateLiveText, updatePastText, updateWhisperer)
         }
     }
     function onSubmit() {

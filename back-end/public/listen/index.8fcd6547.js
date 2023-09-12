@@ -22096,6 +22096,7 @@ if (!$aabe4dd59eb48f51$var$publisherId || !$aabe4dd59eb48f51$var$publisherName |
 });
 const $aabe4dd59eb48f51$var$channelName = `${$aabe4dd59eb48f51$var$publisherId}:whisper`;
 let $aabe4dd59eb48f51$var$resetInProgress = false;
+let $aabe4dd59eb48f51$var$presenceMessagesProcessed = 0;
 const $aabe4dd59eb48f51$var$disconnectedLiveText = "This is where live text will appear";
 const $aabe4dd59eb48f51$var$disconnectedPastText = "This is where past text will appear";
 function $aabe4dd59eb48f51$export$2e2bcd8739ae039() {
@@ -22105,9 +22106,9 @@ function $aabe4dd59eb48f51$export$2e2bcd8739ae039() {
     const [pastText, updatePastText] = (0, $dZtnC.useState)($aabe4dd59eb48f51$var$disconnectedPastText);
     const [channel] = (0, $ee5486cf5f4bc1e1$exports.useChannel)($aabe4dd59eb48f51$var$channelName, (message)=>$aabe4dd59eb48f51$var$receiveChunk(message, channel, updateWhisperer, liveText, updateLiveText, pastText, updatePastText));
     const [presence, updatePresence] = (0, $79d1d236c59022a3$exports.usePresence)($aabe4dd59eb48f51$var$channelName, client);
-    if (presence.length > 0) {
-        console.log(`Processing ${presence.length} presence messages`);
-        for (const message of presence)$aabe4dd59eb48f51$var$receivePresence(message, channel, updateLiveText, updatePastText, updateWhisperer);
+    if (presence.length > $aabe4dd59eb48f51$var$presenceMessagesProcessed) {
+        console.log(`Processing ${presence.length - $aabe4dd59eb48f51$var$presenceMessagesProcessed} presence messages`);
+        for(; $aabe4dd59eb48f51$var$presenceMessagesProcessed < presence.length; $aabe4dd59eb48f51$var$presenceMessagesProcessed++)$aabe4dd59eb48f51$var$receivePresence(presence[$aabe4dd59eb48f51$var$presenceMessagesProcessed], channel, updateLiveText, updatePastText, updateWhisperer);
     }
     function onSubmit() {
         updatePresence($aabe4dd59eb48f51$var$clientName);

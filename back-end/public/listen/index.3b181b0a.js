@@ -22169,8 +22169,7 @@ function $aabe4dd59eb48f51$var$LiveText(props) {
     return /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)("textarea", {
         id: "liveText",
         rows: 25,
-        readOnly: true,
-        children: props.liveText
+        value: props.liveText
     });
 }
 function $aabe4dd59eb48f51$var$PastText(props) {
@@ -22178,7 +22177,7 @@ function $aabe4dd59eb48f51$var$PastText(props) {
         id: "pastText",
         rows: 25,
         readOnly: true,
-        children: props.pastText
+        value: props.pastText
     });
 }
 function $aabe4dd59eb48f51$var$receiveChunk(message, channel, updateWhisperer, liveText, updateLiveText, pastText, updatePastText) {

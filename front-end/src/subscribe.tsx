@@ -98,9 +98,8 @@ function LiveText(props: { liveText: string }) {
         <textarea
             id="liveText"
             rows={25}
-            readOnly={true}>
-            {props.liveText}
-        </textarea>
+            value={props.liveText}
+        />
     )
 }
 
@@ -109,9 +108,9 @@ function PastText(props: { pastText: string }) {
         <textarea
             id="pastText"
             rows={25}
-            readOnly={true}>
-            {props.pastText}
-        </textarea>
+            readOnly={true}
+            value={props.pastText}
+        />
     )
 }
 

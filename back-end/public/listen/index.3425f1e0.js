@@ -22089,10 +22089,12 @@ const $aabe4dd59eb48f51$var$urlParams = new URLSearchParams(window.location.sear
 const $aabe4dd59eb48f51$var$publisherId = $aabe4dd59eb48f51$var$urlParams.get("publisherId") || "";
 let $aabe4dd59eb48f51$var$publisherName = $aabe4dd59eb48f51$var$urlParams.get("publisherName") || "";
 const $aabe4dd59eb48f51$var$clientId = $aabe4dd59eb48f51$var$urlParams.get("clientId") || "";
-const $aabe4dd59eb48f51$var$clientName = $aabe4dd59eb48f51$var$urlParams.get("clientName") || "";
+let $aabe4dd59eb48f51$var$clientName = $aabe4dd59eb48f51$var$urlParams.get("clientName") || "";
 if (!$aabe4dd59eb48f51$var$publisherId || !$aabe4dd59eb48f51$var$publisherName || !$aabe4dd59eb48f51$var$clientId || !$aabe4dd59eb48f51$var$clientName) window.location.href = "/subscribe404.html";
 (0, $d799d042e916e980$export$8ac5987c63437aef)({
-    authUrl: "/api/subscribeTokenRequest"
+    clientId: $aabe4dd59eb48f51$var$clientId,
+    authUrl: "/api/subscribeTokenRequest",
+    echoMessages: false
 });
 const $aabe4dd59eb48f51$var$channelName = `${$aabe4dd59eb48f51$var$publisherId}:whisper`;
 let $aabe4dd59eb48f51$var$resetInProgress = false;
@@ -22110,17 +22112,12 @@ function $aabe4dd59eb48f51$export$2e2bcd8739ae039() {
         console.log(`Processing ${presence.length - $aabe4dd59eb48f51$var$presenceMessagesProcessed} presence messages`);
         for(; $aabe4dd59eb48f51$var$presenceMessagesProcessed < presence.length; $aabe4dd59eb48f51$var$presenceMessagesProcessed++)$aabe4dd59eb48f51$var$receivePresence(presence[$aabe4dd59eb48f51$var$presenceMessagesProcessed], channel, updateLiveText, updatePastText, updateWhisperer);
     }
-    function onSubmit() {
-        updatePresence($aabe4dd59eb48f51$var$clientName);
-        return false;
-    }
     return /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsxs)((0, $6ac8170ffe1babd5$exports.Fragment), {
         children: [
             /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)($aabe4dd59eb48f51$var$PublisherName, {
                 whisperer: whisperer
             }),
             /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsxs)("form", {
-                onSubmit: onSubmit,
                 children: [
                     /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)($aabe4dd59eb48f51$var$ClientName, {
                         client: client,
@@ -22145,7 +22142,11 @@ function $aabe4dd59eb48f51$var$PublisherName(props) {
 }
 function $aabe4dd59eb48f51$var$ClientName(props) {
     function onChange(e) {
-        props.updateClient(e.target.value);
+        $aabe4dd59eb48f51$var$clientName = e.target.value;
+        props.updateClient($aabe4dd59eb48f51$var$clientName);
+    }
+    function onUpdate() {
+        props.updatePresence($aabe4dd59eb48f51$var$clientName);
     }
     return /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsxs)((0, $6ac8170ffe1babd5$exports.Fragment), {
         children: [
@@ -22156,8 +22157,9 @@ function $aabe4dd59eb48f51$var$ClientName(props) {
                 onChange: onChange
             }),
             /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)("button", {
-                id: "submitButton",
-                type: "submit",
+                id: "updateButton",
+                type: "button",
+                onClick: onUpdate,
                 children: "Update"
             })
         ]
@@ -22189,7 +22191,7 @@ function $aabe4dd59eb48f51$var$receiveChunk(message, channel, updateWhisperer, l
             updateWhisperer(`Dropped by ${$aabe4dd59eb48f51$var$publisherName}`);
             updateLiveText($aabe4dd59eb48f51$var$disconnectedLiveText);
             updatePastText($aabe4dd59eb48f51$var$disconnectedPastText);
-        } else console.log("Ignoring unexpected chunk:", message.data);
+        } else $aabe4dd59eb48f51$var$processChunk(message.data, liveText, updateLiveText, pastText, updatePastText);
     } else if (message.name === "all") $aabe4dd59eb48f51$var$processChunk(message.data, liveText, updateLiveText, pastText, updatePastText);
     else if (message.clientId.toUpperCase() != $aabe4dd59eb48f51$var$publisherId.toUpperCase()) console.log(`Ignoring chunk from non-listener ${message.clientId}, topic ${message.name}: ${message.data}`);
     else console.log(`Ignoring chunk with topic ${message.name}: ${message.data}`);

@@ -9,6 +9,10 @@ body {
     padding: 5px;
 }
 
+#updateButton {
+    padding: 5px;
+}
+
 #liveText {
     box-sizing: border-box;
     width: 100%;

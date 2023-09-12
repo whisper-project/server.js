@@ -10,12 +10,16 @@ const urlParams = new URLSearchParams(window.location.search)
 const publisherId = urlParams.get('publisherId') || ''
 let publisherName = urlParams.get('publisherName') || ''
 const clientId = urlParams.get('clientId') || ''
-const clientName = urlParams.get('clientName') || ''
+let clientName = urlParams.get('clientName') || ''
 if (!publisherId || !publisherName || !clientId || !clientName) {
     window.location.href = "/subscribe404.html"
 }
 
-configureAbly({authUrl: '/api/subscribeTokenRequest'})
+configureAbly({
+    clientId: clientId,
+    authUrl: '/api/subscribeTokenRequest',
+    echoMessages: false,
+})
 const channelName = `${publisherId}:whisper`
 let resetInProgress: boolean = false
 let presenceMessagesProcessed = 0
@@ -40,16 +44,11 @@ export default function ListenView() {
                 channel, updateLiveText, updatePastText, updateWhisperer)
         }
     }
-    function onSubmit() {
-        updatePresence(clientName)
-        return false
-    }
-
 
     return (
         <>
             <PublisherName whisperer={whisperer}/>
-            <form onSubmit={onSubmit}>
+            <form>
                 <ClientName client={client} updateClient={updateClient} updatePresence={updatePresence} />
                 <LiveText liveText={liveText}/>
                 <PastText pastText={pastText}/>
@@ -68,7 +67,11 @@ function ClientName(props: {
     updatePresence: (p: string) => void,
 }) {
     function onChange(e: React.ChangeEvent<HTMLInputElement>) {
-        props.updateClient(e.target.value)
+        clientName = e.target.value
+        props.updateClient(clientName)
+    }
+    function onUpdate() {
+        props.updatePresence(clientName)
     }
 
     return (
@@ -80,8 +83,9 @@ function ClientName(props: {
                 onChange={onChange}
             />
             <button
-                id="submitButton"
-                type="submit"
+                id="updateButton"
+                type="button"
+                onClick={onUpdate}
             >
                 Update
             </button>
@@ -128,7 +132,7 @@ function receiveChunk(message: Ably.Message,
             updateLiveText(disconnectedLiveText)
             updatePastText(disconnectedPastText)
         } else {
-            console.log('Ignoring unexpected chunk:', message.data)
+            processChunk(message.data as string, liveText, updateLiveText, pastText, updatePastText)
         }
     } else if (message.name === 'all') {
         processChunk(message.data as string, liveText, updateLiveText, pastText, updatePastText)

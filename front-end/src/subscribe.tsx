@@ -37,12 +37,16 @@ export default function ListenView() {
             receivePresence(message as Ably.PresenceMessage, channel, updateLiveText, updatePastText, updateWhisperer)
         }
     }
+    function onSubmit() {
+        updatePresence(clientName)
+        return false
+    }
 
 
     return (
         <>
             <PublisherName whisperer={whisperer}/>
-            <form>
+            <form onSubmit={onSubmit}>
                 <ClientName client={client} updateClient={updateClient} updatePresence={updatePresence} />
                 <LiveText liveText={liveText}/>
                 <PastText pastText={pastText}/>
@@ -60,14 +64,6 @@ function ClientName(props: {
     updateClient: React.Dispatch<React.SetStateAction<string>>,
     updatePresence: (p: string) => void,
 }) {
-    function handleSubmit() {
-        if (props.client) {
-            props.updatePresence(props.client)
-        } else {
-            props.updatePresence(clientName)
-        }
-    }
-
     function onChange(e: React.ChangeEvent<HTMLInputElement>) {
         props.updateClient(e.target.value)
     }
@@ -83,7 +79,6 @@ function ClientName(props: {
             <button
                 id="submitButton"
                 type="submit"
-                onSubmit={handleSubmit}
             >
                 Update
             </button>

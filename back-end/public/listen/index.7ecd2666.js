@@ -22109,12 +22109,17 @@ function $aabe4dd59eb48f51$export$2e2bcd8739ae039() {
         console.log(`Processing ${presence.length} presence messages`);
         for (const message of presence)$aabe4dd59eb48f51$var$receivePresence(message, channel, updateLiveText, updatePastText, updateWhisperer);
     }
+    function onSubmit() {
+        updatePresence($aabe4dd59eb48f51$var$clientName);
+        return false;
+    }
     return /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsxs)((0, $6ac8170ffe1babd5$exports.Fragment), {
         children: [
             /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)($aabe4dd59eb48f51$var$PublisherName, {
                 whisperer: whisperer
             }),
             /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsxs)("form", {
+                onSubmit: onSubmit,
                 children: [
                     /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)($aabe4dd59eb48f51$var$ClientName, {
                         client: client,
@@ -22138,10 +22143,6 @@ function $aabe4dd59eb48f51$var$PublisherName(props) {
     });
 }
 function $aabe4dd59eb48f51$var$ClientName(props) {
-    function handleSubmit() {
-        if (props.client) props.updatePresence(props.client);
-        else props.updatePresence($aabe4dd59eb48f51$var$clientName);
-    }
     function onChange(e) {
         props.updateClient(e.target.value);
     }
@@ -22156,7 +22157,6 @@ function $aabe4dd59eb48f51$var$ClientName(props) {
             /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)("button", {
                 id: "submitButton",
                 type: "submit",
-                onSubmit: handleSubmit,
                 children: "Update"
             })
         ]

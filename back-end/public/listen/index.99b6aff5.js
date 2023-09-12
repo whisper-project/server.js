@@ -22223,6 +22223,7 @@ function $aabe4dd59eb48f51$var$receivePresence(message, channel, updateLiveText,
 function $aabe4dd59eb48f51$var$readAllText(channel, updateLiveText, updatePastText) {
     if ($aabe4dd59eb48f51$var$resetInProgress) // already reading all the text
     return;
+    console.log("Requesting resend of all text...");
     $aabe4dd59eb48f51$var$resetInProgress = true;
     // reset the current text
     updatePastText("");

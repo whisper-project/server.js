@@ -177,6 +177,7 @@ function readAllText(channel: Ably.RealtimeChannelCallbacks,
         // already reading all the text
         return
     }
+    console.log("Requesting resend of all text...")
     resetInProgress = true
     // reset the current text
     updatePastText('')

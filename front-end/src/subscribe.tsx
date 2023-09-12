@@ -30,29 +30,20 @@ export default function ListenView() {
         channelName,
         (message) => receiveChunk(
             message, channel, updateWhisperer, liveText, updateLiveText, pastText, updatePastText))
-    const [presence, updatePresence] = usePresence(
-        channelName,
-        client,
-        (message) => receivePresence(
-            message as Ably.PresenceMessage, channel, updateLiveText, updatePastText, updateWhisperer))
+    const [presence, updatePresence] = usePresence(channelName, client)
     if (presence.length > 0) {
-        console.log(`Processing ${presence.length} historical presence messages`)
+        console.log(`Processing ${presence.length} presence messages`)
         for (const message of presence) {
             receivePresence(message as Ably.PresenceMessage, channel, updateLiveText, updatePastText, updateWhisperer)
         }
     }
 
 
-    function updateClientEverywhere(name: string) {
-        updateClient(name)
-        updatePresence(name)
-    }
-
     return (
         <>
             <PublisherName whisperer={whisperer}/>
             <form>
-                <ClientName client={client} updateClient={updateClientEverywhere}/>
+                <ClientName client={client} updateClient={updateClient} updatePresence={updatePresence} />
                 <LiveText liveText={liveText}/>
                 <PastText pastText={pastText}/>
             </form>
@@ -64,11 +55,21 @@ function PublisherName(props: { whisperer: string }) {
     return <h1>{props.whisperer}</h1>
 }
 
-function ClientName(props: { client: string, updateClient: (s: string) => void }) {
+function ClientName(props: {
+    client: string,
+    updateClient: React.Dispatch<React.SetStateAction<string>>,
+    updatePresence: (p: string) => void,
+}) {
     function handleSubmit() {
-        const input = document.getElementById('listenerName')
-        if (input && input.textContent) {
-            props.updateClient(input.textContent)}
+        if (props.client) {
+            props.updatePresence(props.client)
+        } else {
+            props.updatePresence(clientName)
+        }
+    }
+
+    function onChange(e: React.ChangeEvent<HTMLInputElement>) {
+        props.updateClient(e.target.value)
     }
 
     return (
@@ -77,6 +78,7 @@ function ClientName(props: { client: string, updateClient: (s: string) => void }
                 id="listenerName"
                 type="text"
                 value={props.client}
+                onChange={onChange}
             />
             <button
                 id="submitButton"
@@ -145,8 +147,10 @@ function receivePresence(message: Ably.PresenceMessage,
                          updateLiveText: React.Dispatch<React.SetStateAction<string>>,
                          updatePastText: React.Dispatch<React.SetStateAction<string>>,
                          updateWhisperer: React.Dispatch<React.SetStateAction<string>>) {
-    if (message.clientId.toUpperCase() === publisherId.toUpperCase()) {
-        console.log(`Received presence from Whisperer: ${message.data}, ${message.action}`)
+    if (message.clientId.toUpperCase() == clientId.toUpperCase()) {
+        console.log(`Ignoring self presence message: ${message.action}, ${message.data}`)
+    } else if (message.clientId.toUpperCase() === publisherId.toUpperCase()) {
+        console.log(`Received presence from Whisperer: ${message.action}, ${message.data}`)
         if (message.action in ['present', 'enter', 'update']) {
             publisherName = message.data
             updateWhisperer(`Connected to ${publisherName}`)

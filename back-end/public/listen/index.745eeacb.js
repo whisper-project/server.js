@@ -22104,14 +22104,10 @@ function $aabe4dd59eb48f51$export$2e2bcd8739ae039() {
     const [liveText, updateLiveText] = (0, $dZtnC.useState)($aabe4dd59eb48f51$var$disconnectedLiveText);
     const [pastText, updatePastText] = (0, $dZtnC.useState)($aabe4dd59eb48f51$var$disconnectedPastText);
     const [channel] = (0, $ee5486cf5f4bc1e1$exports.useChannel)($aabe4dd59eb48f51$var$channelName, (message)=>$aabe4dd59eb48f51$var$receiveChunk(message, channel, updateWhisperer, liveText, updateLiveText, pastText, updatePastText));
-    const [presence, updatePresence] = (0, $79d1d236c59022a3$exports.usePresence)($aabe4dd59eb48f51$var$channelName, client, (message)=>$aabe4dd59eb48f51$var$receivePresence(message, channel, updateLiveText, updatePastText, updateWhisperer));
+    const [presence, updatePresence] = (0, $79d1d236c59022a3$exports.usePresence)($aabe4dd59eb48f51$var$channelName, client);
     if (presence.length > 0) {
-        console.log(`Processing ${presence.length} historical presence messages`);
+        console.log(`Processing ${presence.length} presence messages`);
         for (const message of presence)$aabe4dd59eb48f51$var$receivePresence(message, channel, updateLiveText, updatePastText, updateWhisperer);
-    }
-    function updateClientEverywhere(name) {
-        updateClient(name);
-        updatePresence(name);
     }
     return /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsxs)((0, $6ac8170ffe1babd5$exports.Fragment), {
         children: [
@@ -22122,7 +22118,8 @@ function $aabe4dd59eb48f51$export$2e2bcd8739ae039() {
                 children: [
                     /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)($aabe4dd59eb48f51$var$ClientName, {
                         client: client,
-                        updateClient: updateClientEverywhere
+                        updateClient: updateClient,
+                        updatePresence: updatePresence
                     }),
                     /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)($aabe4dd59eb48f51$var$LiveText, {
                         liveText: liveText
@@ -22142,15 +22139,19 @@ function $aabe4dd59eb48f51$var$PublisherName(props) {
 }
 function $aabe4dd59eb48f51$var$ClientName(props) {
     function handleSubmit() {
-        const input = document.getElementById("listenerName");
-        if (input && input.textContent) props.updateClient(input.textContent);
+        if (props.client) props.updatePresence(props.client);
+        else props.updatePresence($aabe4dd59eb48f51$var$clientName);
+    }
+    function onChange(e) {
+        props.updateClient(e.target.value);
     }
     return /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsxs)((0, $6ac8170ffe1babd5$exports.Fragment), {
         children: [
             /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)("input", {
                 id: "listenerName",
                 type: "text",
-                value: props.client
+                value: props.client,
+                onChange: onChange
             }),
             /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)("button", {
                 id: "submitButton",
@@ -22192,8 +22193,9 @@ function $aabe4dd59eb48f51$var$receiveChunk(message, channel, updateWhisperer, l
     else console.log(`Ignoring chunk with topic ${message.name}: ${message.data}`);
 }
 function $aabe4dd59eb48f51$var$receivePresence(message, channel, updateLiveText, updatePastText, updateWhisperer) {
-    if (message.clientId.toUpperCase() === $aabe4dd59eb48f51$var$publisherId.toUpperCase()) {
-        console.log(`Received presence from Whisperer: ${message.data}, ${message.action}`);
+    if (message.clientId.toUpperCase() == $aabe4dd59eb48f51$var$clientId.toUpperCase()) console.log(`Ignoring self presence message: ${message.action}, ${message.data}`);
+    else if (message.clientId.toUpperCase() === $aabe4dd59eb48f51$var$publisherId.toUpperCase()) {
+        console.log(`Received presence from Whisperer: ${message.action}, ${message.data}`);
         if (message.action in [
             "present",
             "enter",

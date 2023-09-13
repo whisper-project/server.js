@@ -169,7 +169,7 @@ export async function subscribeToPublisher(req: express.Request, res: express.Re
     setCookie('publisherId', publisherId)
     setCookie('publisherName', publisherName)
     setCookie('clientId', clientId)
-    setCookie('clientName', req.cookies.get('clientName') || '')
+    setCookie('clientName', req.cookies?.clientName || '')
     res.setHeader('Location', `/listen/index.html`)
     res.status(303).send()
 }

@@ -30,11 +30,13 @@ export default function ListenView() {
     const [whisperer, updateWhisperer] = useState(`Connecting to ${publisherName}...`)
     const [client, updateClient] = useState(clientName)
     const [liveText, updateLiveText] = useState(disconnectedLiveText)
+    function getLiveText() { return liveText }
     const [pastText, updatePastText] = useState(disconnectedPastText)
+    function getPastText() { return pastText }
     const [channel] = useChannel(
         channelName,
         (message) => receiveChunk(
-            message, channel, updateWhisperer, liveText, updateLiveText, pastText, updatePastText))
+            message, channel, updateWhisperer, getLiveText, updateLiveText, getPastText, updatePastText))
     const [presence, updatePresence] = usePresence(channelName, client)
     if (presence.length > presenceMessagesProcessed) {
         console.log(`Processing ${presence.length - presenceMessagesProcessed} presence messages`)
@@ -117,9 +119,9 @@ function PastText(props: { pastText: string }) {
 function receiveChunk(message: Ably.Message,
                       channel: Ably.RealtimeChannelCallbacks,
                       updateWhisperer: React.Dispatch<React.SetStateAction<string>>,
-                      liveText: string,
+                      getLiveText: () => string,
                       updateLiveText: React.Dispatch<React.SetStateAction<string>>,
-                      pastText: string,
+                      getPastText: () => string,
                       updatePastText: React.Dispatch<React.SetStateAction<string>>) {
     if (message.name.toUpperCase() === clientId.toUpperCase()) {
         console.log(`Received chunk directed here: ${message.data}`)
@@ -131,10 +133,10 @@ function receiveChunk(message: Ably.Message,
             updateLiveText(disconnectedLiveText)
             updatePastText(disconnectedPastText)
         } else {
-            processChunk(message.data as string, liveText, updateLiveText, pastText, updatePastText)
+            processChunk(message.data as string, getLiveText, updateLiveText, getPastText, updatePastText)
         }
     } else if (message.name === 'all') {
-        processChunk(message.data as string, liveText, updateLiveText, pastText, updatePastText)
+        processChunk(message.data as string, getLiveText, updateLiveText, getPastText, updatePastText)
     } else {
         if (message.clientId.toUpperCase() != publisherId.toUpperCase()) {
             console.log(`Ignoring chunk from non-listener ${message.clientId}, topic ${message.name}: ${message.data}`)
@@ -186,9 +188,9 @@ function readAllText(channel: Ably.RealtimeChannelCallbacks,
 }
 
 function processChunk(chunk: string,
-                      liveText: string,
+                      getLiveText: () => string,
                       updateLiveText: React.Dispatch<React.SetStateAction<string>>,
-                      pastText: string,
+                      getPastText: () => string,
                       updatePastText: React.Dispatch<React.SetStateAction<string>>) {
     function isDiff(chunk: string): boolean {
         return chunk.startsWith('-1') || !chunk.startsWith('-')
@@ -203,7 +205,7 @@ function processChunk(chunk: string,
             console.log("Ignoring diff chunk because a read is in progress")
         } else if (chunk.startsWith('-1|') || chunk.startsWith('-2|')) {
             console.log("Prepending past line chunk")
-            updatePastText(chunk.substring(3) + '\n' + pastText)
+            updatePastText(chunk.substring(3) + '\n' + getPastText())
         } else if (chunk.startsWith('-3|')) {
             console.log("Receive live text chunk, update is over")
             updateLiveText(chunk.substring(3))
@@ -216,12 +218,12 @@ function processChunk(chunk: string,
             updateLiveText(chunk.substring(3))
         } else if (chunk.startsWith('-1|')) {
             console.log("Prepending live text to past line")
-            updatePastText(liveText + '\n' + pastText)
+            updatePastText(getLiveText() + '\n' + getPastText())
             updateLiveText('')
         } else {
             const [offsetDigits, text] = chunk.split('|', 1)
             const offset = parseInt(offsetDigits)
-            updateLiveText(liveText.substring(0, offset) + text)
+            updateLiveText(getLiveText().substring(0, offset) + text)
         }
     }
 }

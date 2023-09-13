@@ -22105,8 +22105,14 @@ function $aabe4dd59eb48f51$export$2e2bcd8739ae039() {
     const [whisperer, updateWhisperer] = (0, $dZtnC.useState)(`Connecting to ${$aabe4dd59eb48f51$var$publisherName}...`);
     const [client, updateClient] = (0, $dZtnC.useState)($aabe4dd59eb48f51$var$clientName);
     const [liveText, updateLiveText] = (0, $dZtnC.useState)($aabe4dd59eb48f51$var$disconnectedLiveText);
+    function getLiveText() {
+        return liveText;
+    }
     const [pastText, updatePastText] = (0, $dZtnC.useState)($aabe4dd59eb48f51$var$disconnectedPastText);
-    const [channel] = (0, $ee5486cf5f4bc1e1$exports.useChannel)($aabe4dd59eb48f51$var$channelName, (message)=>$aabe4dd59eb48f51$var$receiveChunk(message, channel, updateWhisperer, liveText, updateLiveText, pastText, updatePastText));
+    function getPastText() {
+        return pastText;
+    }
+    const [channel] = (0, $ee5486cf5f4bc1e1$exports.useChannel)($aabe4dd59eb48f51$var$channelName, (message)=>$aabe4dd59eb48f51$var$receiveChunk(message, channel, updateWhisperer, getLiveText, updateLiveText, getPastText, updatePastText));
     const [presence, updatePresence] = (0, $79d1d236c59022a3$exports.usePresence)($aabe4dd59eb48f51$var$channelName, client);
     if (presence.length > $aabe4dd59eb48f51$var$presenceMessagesProcessed) {
         console.log(`Processing ${presence.length - $aabe4dd59eb48f51$var$presenceMessagesProcessed} presence messages`);
@@ -22180,7 +22186,7 @@ function $aabe4dd59eb48f51$var$PastText(props) {
         value: props.pastText
     });
 }
-function $aabe4dd59eb48f51$var$receiveChunk(message, channel, updateWhisperer, liveText, updateLiveText, pastText, updatePastText) {
+function $aabe4dd59eb48f51$var$receiveChunk(message, channel, updateWhisperer, getLiveText, updateLiveText, getPastText, updatePastText) {
     if (message.name.toUpperCase() === $aabe4dd59eb48f51$var$clientId.toUpperCase()) {
         console.log(`Received chunk directed here: ${message.data}`);
         const [offset, text] = message.data.split("|", 1);
@@ -22190,8 +22196,8 @@ function $aabe4dd59eb48f51$var$receiveChunk(message, channel, updateWhisperer, l
             updateWhisperer(`Dropped by ${$aabe4dd59eb48f51$var$publisherName}`);
             updateLiveText($aabe4dd59eb48f51$var$disconnectedLiveText);
             updatePastText($aabe4dd59eb48f51$var$disconnectedPastText);
-        } else $aabe4dd59eb48f51$var$processChunk(message.data, liveText, updateLiveText, pastText, updatePastText);
-    } else if (message.name === "all") $aabe4dd59eb48f51$var$processChunk(message.data, liveText, updateLiveText, pastText, updatePastText);
+        } else $aabe4dd59eb48f51$var$processChunk(message.data, getLiveText, updateLiveText, getPastText, updatePastText);
+    } else if (message.name === "all") $aabe4dd59eb48f51$var$processChunk(message.data, getLiveText, updateLiveText, getPastText, updatePastText);
     else if (message.clientId.toUpperCase() != $aabe4dd59eb48f51$var$publisherId.toUpperCase()) console.log(`Ignoring chunk from non-listener ${message.clientId}, topic ${message.name}: ${message.data}`);
     else console.log(`Ignoring chunk with topic ${message.name}: ${message.data}`);
 }
@@ -22230,7 +22236,7 @@ function $aabe4dd59eb48f51$var$readAllText(channel, updateLiveText, updatePastTe
     // request the whisperer to send all the text
     channel.publish($aabe4dd59eb48f51$var$publisherId, "-20|all");
 }
-function $aabe4dd59eb48f51$var$processChunk(chunk, liveText, updateLiveText, pastText, updatePastText) {
+function $aabe4dd59eb48f51$var$processChunk(chunk, getLiveText, updateLiveText, getPastText, updatePastText) {
     function isDiff(chunk) {
         return chunk.startsWith("-1") || !chunk.startsWith("-");
     }
@@ -22242,7 +22248,7 @@ function $aabe4dd59eb48f51$var$processChunk(chunk, liveText, updateLiveText, pas
         } else if (isDiff(chunk)) console.log("Ignoring diff chunk because a read is in progress");
         else if (chunk.startsWith("-1|") || chunk.startsWith("-2|")) {
             console.log("Prepending past line chunk");
-            updatePastText(chunk.substring(3) + "\n" + pastText);
+            updatePastText(chunk.substring(3) + "\n" + getPastText());
         } else if (chunk.startsWith("-3|")) {
             console.log("Receive live text chunk, update is over");
             updateLiveText(chunk.substring(3));
@@ -22253,12 +22259,12 @@ function $aabe4dd59eb48f51$var$processChunk(chunk, liveText, updateLiveText, pas
         else if (chunk.startsWith("0|")) updateLiveText(chunk.substring(3));
         else if (chunk.startsWith("-1|")) {
             console.log("Prepending live text to past line");
-            updatePastText(liveText + "\n" + pastText);
+            updatePastText(getLiveText() + "\n" + getPastText());
             updateLiveText("");
         } else {
             const [offsetDigits, text] = chunk.split("|", 1);
             const offset = parseInt(offsetDigits);
-            updateLiveText(liveText.substring(0, offset) + text);
+            updateLiveText(getLiveText().substring(0, offset) + text);
         }
     }
 }

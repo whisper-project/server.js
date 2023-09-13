@@ -3,6 +3,7 @@
 // See the LICENSE file for details.
 
 import express from 'express'
+import cookieParser from 'cookie-parser'
 import cookieSession from 'cookie-session'
 
 import {
@@ -20,6 +21,7 @@ const PORT = process.env.PORT || 5001;
 loadSettings()
 await getDb()
 
+const cookieMiddleware = cookieParser()
 const sessionMiddleware = cookieSession({ keys: await getSessionKeys() })
 
 express()
@@ -28,8 +30,8 @@ express()
     .post('/api/apnsToken', asyncWrapper(apnsToken))
     .post('/api/apnsReceivedNotification', asyncWrapper(apnsReceivedNotification))
     .post('/api/pubSubTokenRequest', asyncWrapper(pubSubTokenRequest))
-    .get('/subscribe/:publisherId', sessionMiddleware, asyncWrapper(subscribeToPublisher))
-    .get('/api/subscribeTokenRequest', sessionMiddleware, asyncWrapper(subscribeTokenRequest))
+    .get('/subscribe/:publisherId', [cookieMiddleware, sessionMiddleware], asyncWrapper(subscribeToPublisher))
+    .get('/api/subscribeTokenRequest', [sessionMiddleware], asyncWrapper(subscribeTokenRequest))
     .listen(PORT, () => console.log(`Listening on port ${PORT}`))
 
 type Handler = (req: express.Request, res: express.Response, next: express.NextFunction) => Promise<void>

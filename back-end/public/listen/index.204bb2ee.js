@@ -1,6 +1,9 @@
 function $parcel$export(e, n, v, s) {
   Object.defineProperty(e, n, {get: v, set: s, enumerable: true, configurable: true});
 }
+function $parcel$interopDefault(a) {
+  return a && a.__esModule ? a.default : a;
+}
 function $parcel$exportWildcard(dest, source) {
   Object.keys(source).forEach(function(key) {
     if (key === 'default' || key === '__esModule' || dest.hasOwnProperty(key)) {
@@ -16,9 +19,6 @@ function $parcel$exportWildcard(dest, source) {
   });
 
   return dest;
-}
-function $parcel$interopDefault(a) {
-  return a && a.__esModule ? a.default : a;
 }
 var $parcel$global =
 typeof globalThis !== 'undefined'
@@ -7953,6 +7953,97 @@ $29de754936e9d2ac$export$757ceba2d55c277e = $98c6094432a1b39f$exports.hydrateRoo
 
 
 var $dZtnC = parcelRequire("dZtnC");
+var $b681bab24d6c5fe7$exports = {};
+(function(global, factory) {
+    $b681bab24d6c5fe7$exports = factory();
+})($b681bab24d6c5fe7$exports, function() {
+    "use strict";
+    /* eslint-disable no-var */ function assign(target) {
+        for(var i = 1; i < arguments.length; i++){
+            var source = arguments[i];
+            for(var key in source)target[key] = source[key];
+        }
+        return target;
+    }
+    /* eslint-enable no-var */ /* eslint-disable no-var */ var defaultConverter = {
+        read: function(value) {
+            if (value[0] === '"') value = value.slice(1, -1);
+            return value.replace(/(%[\dA-F]{2})+/gi, decodeURIComponent);
+        },
+        write: function(value) {
+            return encodeURIComponent(value).replace(/%(2[346BF]|3[AC-F]|40|5[BDE]|60|7[BCD])/g, decodeURIComponent);
+        }
+    };
+    /* eslint-enable no-var */ /* eslint-disable no-var */ function init(converter, defaultAttributes) {
+        function set(name, value, attributes) {
+            if (typeof document === "undefined") return;
+            attributes = assign({}, defaultAttributes, attributes);
+            if (typeof attributes.expires === "number") attributes.expires = new Date(Date.now() + attributes.expires * 864e5);
+            if (attributes.expires) attributes.expires = attributes.expires.toUTCString();
+            name = encodeURIComponent(name).replace(/%(2[346B]|5E|60|7C)/g, decodeURIComponent).replace(/[()]/g, escape);
+            var stringifiedAttributes = "";
+            for(var attributeName in attributes){
+                if (!attributes[attributeName]) continue;
+                stringifiedAttributes += "; " + attributeName;
+                if (attributes[attributeName] === true) continue;
+                // Considers RFC 6265 section 5.2:
+                // ...
+                // 3.  If the remaining unparsed-attributes contains a %x3B (";")
+                //     character:
+                // Consume the characters of the unparsed-attributes up to,
+                // not including, the first %x3B (";") character.
+                // ...
+                stringifiedAttributes += "=" + attributes[attributeName].split(";")[0];
+            }
+            return document.cookie = name + "=" + converter.write(value, name) + stringifiedAttributes;
+        }
+        function get(name) {
+            if (typeof document === "undefined" || arguments.length && !name) return;
+            // To prevent the for loop in the first place assign an empty array
+            // in case there are no cookies at all.
+            var cookies = document.cookie ? document.cookie.split("; ") : [];
+            var jar = {};
+            for(var i = 0; i < cookies.length; i++){
+                var parts = cookies[i].split("=");
+                var value = parts.slice(1).join("=");
+                try {
+                    var found = decodeURIComponent(parts[0]);
+                    jar[found] = converter.read(value, found);
+                    if (name === found) break;
+                } catch (e) {}
+            }
+            return name ? jar[name] : jar;
+        }
+        return Object.create({
+            set: set,
+            get: get,
+            remove: function(name, attributes) {
+                set(name, "", assign({}, attributes, {
+                    expires: -1
+                }));
+            },
+            withAttributes: function(attributes) {
+                return init(this.converter, assign({}, this.attributes, attributes));
+            },
+            withConverter: function(converter) {
+                return init(assign({}, this.converter, converter), this.attributes);
+            }
+        }, {
+            attributes: {
+                value: Object.freeze(defaultAttributes)
+            },
+            converter: {
+                value: Object.freeze(converter)
+            }
+        });
+    }
+    var api = init(defaultConverter, {
+        path: "/"
+    });
+    /* eslint-enable no-var */ return api;
+});
+
+
 var $fc7dab5246cef5a7$exports = {};
 $parcel$export($fc7dab5246cef5a7$exports, "configureAbly", () => $d799d042e916e980$export$8ac5987c63437aef);
 var $21c352e1bac7abcb$exports = {};
@@ -22085,12 +22176,11 @@ $parcel$exportWildcard($fc7dab5246cef5a7$exports, $ee5486cf5f4bc1e1$exports);
 $parcel$exportWildcard($fc7dab5246cef5a7$exports, $79d1d236c59022a3$exports);
 
 
-const $aabe4dd59eb48f51$var$urlParams = new URLSearchParams(window.location.search);
-const $aabe4dd59eb48f51$var$publisherId = $aabe4dd59eb48f51$var$urlParams.get("publisherId") || "";
-let $aabe4dd59eb48f51$var$publisherName = $aabe4dd59eb48f51$var$urlParams.get("publisherName") || "";
-const $aabe4dd59eb48f51$var$clientId = $aabe4dd59eb48f51$var$urlParams.get("clientId") || "";
-let $aabe4dd59eb48f51$var$clientName = $aabe4dd59eb48f51$var$urlParams.get("clientName") || "";
-if (!$aabe4dd59eb48f51$var$publisherId || !$aabe4dd59eb48f51$var$publisherName || !$aabe4dd59eb48f51$var$clientId || !$aabe4dd59eb48f51$var$clientName) window.location.href = "/subscribe404.html";
+const $aabe4dd59eb48f51$var$publisherId = (0, (/*@__PURE__*/$parcel$interopDefault($b681bab24d6c5fe7$exports))).get("publisherId") || "";
+let $aabe4dd59eb48f51$var$publisherName = (0, (/*@__PURE__*/$parcel$interopDefault($b681bab24d6c5fe7$exports))).get("publisherName") || "";
+const $aabe4dd59eb48f51$var$clientId = (0, (/*@__PURE__*/$parcel$interopDefault($b681bab24d6c5fe7$exports))).get("clientId") || "";
+let $aabe4dd59eb48f51$var$clientName = (0, (/*@__PURE__*/$parcel$interopDefault($b681bab24d6c5fe7$exports))).get("clientName") || "";
+if (!$aabe4dd59eb48f51$var$publisherId || !$aabe4dd59eb48f51$var$publisherName || !$aabe4dd59eb48f51$var$clientId) window.location.href = "/subscribe404.html";
 (0, $d799d042e916e980$export$8ac5987c63437aef)({
     clientId: $aabe4dd59eb48f51$var$clientId,
     authUrl: "/api/subscribeTokenRequest",
@@ -22101,57 +22191,38 @@ let $aabe4dd59eb48f51$var$resetInProgress = false;
 let $aabe4dd59eb48f51$var$presenceMessagesProcessed = 0;
 const $aabe4dd59eb48f51$var$disconnectedText = {
     live: "This is where live text will appear",
-    past: "This is where past text will appear"
+    past: "This is where past text will appear.\nThe newest lines will appear on top."
 };
 function $aabe4dd59eb48f51$export$2e2bcd8739ae039() {
-    const [whisperer, updateWhisperer] = (0, $dZtnC.useState)(`Connecting to ${$aabe4dd59eb48f51$var$publisherName}...`);
-    const [client, updateClient] = (0, $dZtnC.useState)($aabe4dd59eb48f51$var$clientName);
-    const [text, updateText] = (0, $dZtnC.useState)($aabe4dd59eb48f51$var$disconnectedText);
-    const [channel] = (0, $ee5486cf5f4bc1e1$exports.useChannel)($aabe4dd59eb48f51$var$channelName, (message)=>$aabe4dd59eb48f51$var$receiveChunk(message, channel, updateWhisperer, updateText));
-    const [presence, updatePresence] = (0, $79d1d236c59022a3$exports.usePresence)($aabe4dd59eb48f51$var$channelName, client);
-    if (presence.length > $aabe4dd59eb48f51$var$presenceMessagesProcessed) {
-        console.log(`Processing ${presence.length - $aabe4dd59eb48f51$var$presenceMessagesProcessed} presence messages`);
-        for(; $aabe4dd59eb48f51$var$presenceMessagesProcessed < presence.length; $aabe4dd59eb48f51$var$presenceMessagesProcessed++)$aabe4dd59eb48f51$var$receivePresence(presence[$aabe4dd59eb48f51$var$presenceMessagesProcessed], channel, updateWhisperer, updateText);
-    }
-    return /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsxs)((0, $6ac8170ffe1babd5$exports.Fragment), {
-        children: [
-            /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)($aabe4dd59eb48f51$var$PublisherName, {
-                whisperer: whisperer
-            }),
-            /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsxs)("form", {
-                children: [
-                    /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)($aabe4dd59eb48f51$var$ClientName, {
-                        client: client,
-                        updateClient: updateClient,
-                        updatePresence: updatePresence
-                    }),
-                    /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)($aabe4dd59eb48f51$var$LivePastText, {
-                        text: text
-                    })
-                ]
-            })
-        ]
+    const [listenerName, setListenerName] = (0, $dZtnC.useState)($aabe4dd59eb48f51$var$clientName);
+    if (listenerName) return /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)($aabe4dd59eb48f51$var$ConnectionView, {});
+    else return /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)($aabe4dd59eb48f51$var$NameView, {
+        name: listenerName,
+        setName: setListenerName
     });
 }
-function $aabe4dd59eb48f51$var$PublisherName(props) {
-    return /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)("h1", {
-        children: props.whisperer
-    });
-}
-function $aabe4dd59eb48f51$var$ClientName(props) {
+function $aabe4dd59eb48f51$var$NameView(props) {
+    const [client, updateClient] = (0, $dZtnC.useState)(props.name);
     function onChange(e) {
-        $aabe4dd59eb48f51$var$clientName = e.target.value;
-        props.updateClient($aabe4dd59eb48f51$var$clientName);
+        updateClient(e.target.value);
     }
     function onUpdate() {
-        props.updatePresence($aabe4dd59eb48f51$var$clientName);
+        props.setName($aabe4dd59eb48f51$var$clientName);
+        (0, (/*@__PURE__*/$parcel$interopDefault($b681bab24d6c5fe7$exports))).set("clientName", $aabe4dd59eb48f51$var$clientName, {
+            expires: 365
+        });
     }
     return /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsxs)((0, $6ac8170ffe1babd5$exports.Fragment), {
         children: [
+            /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)("label", {
+                htmlFor: "listenerName",
+                children: "Your name:"
+            }),
             /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)("input", {
+                name: "listenerName",
                 id: "listenerName",
                 type: "text",
-                value: props.client,
+                value: client.valueOf(),
                 onChange: onChange
             }),
             /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)("button", {
@@ -22161,6 +22232,33 @@ function $aabe4dd59eb48f51$var$ClientName(props) {
                 children: "Update"
             })
         ]
+    });
+}
+function $aabe4dd59eb48f51$var$ConnectionView() {
+    const [whisperer, updateWhisperer] = (0, $dZtnC.useState)(`Connecting to ${$aabe4dd59eb48f51$var$publisherName}...`);
+    const [text, updateText] = (0, $dZtnC.useState)($aabe4dd59eb48f51$var$disconnectedText);
+    const [channel] = (0, $ee5486cf5f4bc1e1$exports.useChannel)($aabe4dd59eb48f51$var$channelName, (message)=>$aabe4dd59eb48f51$var$receiveChunk(message, channel, updateWhisperer, updateText));
+    const [presence] = (0, $79d1d236c59022a3$exports.usePresence)($aabe4dd59eb48f51$var$channelName, $aabe4dd59eb48f51$var$clientName);
+    if (presence.length > $aabe4dd59eb48f51$var$presenceMessagesProcessed) {
+        console.log(`Processing ${presence.length - $aabe4dd59eb48f51$var$presenceMessagesProcessed} presence messages`);
+        for(; $aabe4dd59eb48f51$var$presenceMessagesProcessed < presence.length; $aabe4dd59eb48f51$var$presenceMessagesProcessed++)$aabe4dd59eb48f51$var$receivePresence(presence[$aabe4dd59eb48f51$var$presenceMessagesProcessed], channel, updateWhisperer, updateText);
+    }
+    return /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsxs)((0, $6ac8170ffe1babd5$exports.Fragment), {
+        children: [
+            /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)($aabe4dd59eb48f51$var$PublisherName, {
+                whisperer: whisperer
+            }),
+            /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)("form", {
+                children: /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)($aabe4dd59eb48f51$var$LivePastText, {
+                    text: text
+                })
+            })
+        ]
+    });
+}
+function $aabe4dd59eb48f51$var$PublisherName(props) {
+    return /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)("h1", {
+        children: props.whisperer
     });
 }
 function $aabe4dd59eb48f51$var$LivePastText(props) {

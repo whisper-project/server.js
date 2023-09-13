@@ -144,31 +144,33 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
 }
 
 export async function subscribeToPublisher(req: express.Request, res: express.Response) {
+    function setCookie(name: string, value: string) {
+        res.cookie(name, value, { maxAge: 365 * 24 * 60 * 60 * 1000, httpOnly: false })
+    }
     const publisherId = req.params?.publisherId
     if (!publisherId || publisherId.match(/^[-0-9a-zA-Z]{36}$/) === null) {
         res.setHeader('Location', '/subscribe404.html')
         res.status(303).send()
         return
     }
-    let clientKey = `cli:${publisherId}`
-    let existing = await getClientData(clientKey)
+    const publisherKey = `cli:${publisherId}`
+    const existing = await getClientData(publisherKey)
     if (!existing) {
         res.setHeader('Location', '/subscribe404.html')
         res.status(303).send()
         return
     }
-    const publisherName = existing?.userName || 'Anonymous'
+    const publisherName = existing?.userName || 'Unknown Whisperer'
     let clientId = req?.session?.clientId
     if (!clientId) {
         clientId = randomUUID().toUpperCase()
     }
-    clientKey = `cli:${clientId}`
-    existing = await getClientData(clientKey)
-    const clientName = existing && existing?.userName ? existing.userName : 'Anonymous'
-    req.session = { publisherId, publisherName, clientId, clientName }
-    const queryString = new URLSearchParams(req.session).toString()
-    const location =`/listen/index.html?${queryString}`
-    res.setHeader('Location', location)
+    req.session = { clientId, publisherId }
+    setCookie('publisherId', publisherId)
+    setCookie('publisherName', publisherName)
+    setCookie('clientId', clientId)
+    setCookie('clientName', req.cookies.get('clientName') || '')
+    res.setHeader('Location', `/listen/index.html`)
     res.status(303).send()
 }
 

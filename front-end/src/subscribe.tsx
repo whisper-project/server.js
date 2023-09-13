@@ -3,15 +3,16 @@
 // See the LICENSE file for details.
 
 import React, {useState} from 'react'
+import Cookies from 'js-cookie'
 import {configureAbly, useChannel, usePresence} from '@ably-labs/react-hooks'
 import {Types as Ably} from 'ably'
 
-const urlParams = new URLSearchParams(window.location.search)
-const publisherId = urlParams.get('publisherId') || ''
-let publisherName = urlParams.get('publisherName') || ''
-const clientId = urlParams.get('clientId') || ''
-let clientName = urlParams.get('clientName') || ''
-if (!publisherId || !publisherName || !clientId || !clientName) {
+const publisherId = Cookies.get('publisherId') || ''
+let publisherName = Cookies.get('publisherName') || ''
+const clientId = Cookies.get('clientId') || ''
+let clientName = Cookies.get('clientName') || ''
+
+if (!publisherId || !publisherName || !clientId) {
     window.location.href = "/subscribe404.html"
 }
 
@@ -20,26 +21,70 @@ configureAbly({
     authUrl: '/api/subscribeTokenRequest',
     echoMessages: false,
 })
+
 const channelName = `${publisherId}:whisper`
 let resetInProgress: boolean = false
 let presenceMessagesProcessed = 0
+
 interface Text {
     live: string,
     past: string,
 }
+
 const disconnectedText: Text = {
     live: 'This is where live text will appear',
-    past: 'This is where past text will appear',
+    past: 'This is where past text will appear.\nThe newest lines will appear on top.',
 }
 
-export default function ListenView() {
+export default function ListenerView() {
+    const [listenerName, setListenerName] = useState(clientName)
+    if (listenerName) {
+        return <ConnectionView />
+    } else {
+        return <NameView name={listenerName} setName={setListenerName} />
+    }
+}
+
+function NameView(props: { name: String, setName: React.Dispatch<React.SetStateAction<string>>} ) {
+    const [client, updateClient] = useState(props.name)
+
+    function onChange(e: React.ChangeEvent<HTMLInputElement>) {
+        updateClient(e.target.value)
+    }
+
+    function onUpdate() {
+        props.setName(clientName)
+        Cookies.set('clientName', clientName, { expires: 365 })
+    }
+
+    return (
+        <>
+            <label htmlFor="listenerName">Your name:</label>
+            <input
+                name="listenerName"
+                id="listenerName"
+                type="text"
+                value={client.valueOf()}
+                onChange={onChange}
+            />
+            <button
+                id="updateButton"
+                type="button"
+                onClick={onUpdate}
+            >
+                Update
+            </button>
+        </>
+    )
+}
+
+function ConnectionView() {
     const [whisperer, updateWhisperer] = useState(`Connecting to ${publisherName}...`)
-    const [client, updateClient] = useState(clientName)
     const [text, updateText] = useState(disconnectedText)
     const [channel] = useChannel(
         channelName,
         (message) => receiveChunk(message, channel, updateWhisperer, updateText))
-    const [presence, updatePresence] = usePresence(channelName, client)
+    const [presence] = usePresence(channelName, clientName)
     if (presence.length > presenceMessagesProcessed) {
         console.log(`Processing ${presence.length - presenceMessagesProcessed} presence messages`)
         for (; presenceMessagesProcessed < presence.length; presenceMessagesProcessed++) {
@@ -53,7 +98,6 @@ export default function ListenView() {
         <>
             <PublisherName whisperer={whisperer}/>
             <form>
-                <ClientName client={client} updateClient={updateClient} updatePresence={updatePresence} />
                 <LivePastText text={text}/>
             </form>
         </>
@@ -62,38 +106,6 @@ export default function ListenView() {
 
 function PublisherName(props: { whisperer: string }) {
     return <h1>{props.whisperer}</h1>
-}
-
-function ClientName(props: {
-    client: string,
-    updateClient: React.Dispatch<React.SetStateAction<string>>,
-    updatePresence: (p: string) => void,
-}) {
-    function onChange(e: React.ChangeEvent<HTMLInputElement>) {
-        clientName = e.target.value
-        props.updateClient(clientName)
-    }
-    function onUpdate() {
-        props.updatePresence(clientName)
-    }
-
-    return (
-        <>
-            <input
-                id="listenerName"
-                type="text"
-                value={props.client}
-                onChange={onChange}
-            />
-            <button
-                id="updateButton"
-                type="button"
-                onClick={onUpdate}
-            >
-                Update
-            </button>
-        </>
-    )
 }
 
 function LivePastText(props: { text: Text }) {

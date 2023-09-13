@@ -209,7 +209,7 @@ function processChunk(chunk: string,
             console.log("Ignoring non-diff chunk because no read in progress")
         } else if (chunk.startsWith('0|')) {
             updateText((text: Text) => {
-                return { live: chunk.substring(3), past: text.past }
+                return { live: chunk.substring(2), past: text.past }
             })
         } else if (chunk.startsWith('-1|')) {
             console.log("Prepending live text to past line")
@@ -217,7 +217,7 @@ function processChunk(chunk: string,
                 return { live: '', past: text.live + '\n' + text.past }
             })
         } else {
-            const [offsetDigits, suffix] = chunk.split('|', 1)
+            const [offsetDigits, suffix] = chunk.split('|', 2)
             const offset = parseInt(offsetDigits)
             updateText((text: Text) => {
                 return { live: text.live.substring(0, offset) + suffix, past: text.past }

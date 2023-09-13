@@ -22267,7 +22267,7 @@ function $aabe4dd59eb48f51$var$processChunk(chunk, updateText) {
         if (!isDiff(chunk)) console.log("Ignoring non-diff chunk because no read in progress");
         else if (chunk.startsWith("0|")) updateText((text)=>{
             return {
-                live: chunk.substring(3),
+                live: chunk.substring(2),
                 past: text.past
             };
         });
@@ -22280,7 +22280,7 @@ function $aabe4dd59eb48f51$var$processChunk(chunk, updateText) {
                 };
             });
         } else {
-            const [offsetDigits, suffix] = chunk.split("|", 1);
+            const [offsetDigits, suffix] = chunk.split("|", 2);
             const offset = parseInt(offsetDigits);
             updateText((text)=>{
                 return {

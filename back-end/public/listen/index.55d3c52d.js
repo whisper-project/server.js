@@ -22204,7 +22204,8 @@ function $aabe4dd59eb48f51$export$2e2bcd8739ae039() {
 function $aabe4dd59eb48f51$var$NameView(props) {
     const [client, updateClient] = (0, $dZtnC.useState)(props.name);
     function onChange(e) {
-        updateClient(e.target.value);
+        $aabe4dd59eb48f51$var$clientName = e.target.value;
+        updateClient($aabe4dd59eb48f51$var$clientName);
     }
     function onUpdate() {
         props.setName($aabe4dd59eb48f51$var$clientName);
@@ -22214,9 +22215,8 @@ function $aabe4dd59eb48f51$var$NameView(props) {
     }
     return /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsxs)((0, $6ac8170ffe1babd5$exports.Fragment), {
         children: [
-            /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)("label", {
-                htmlFor: "listenerName",
-                children: "Your name:"
+            /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)("h2", {
+                children: "Please provide your name to the whisperer:"
             }),
             /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)("input", {
                 name: "listenerName",

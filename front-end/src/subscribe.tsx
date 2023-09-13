@@ -49,7 +49,8 @@ function NameView(props: { name: String, setName: React.Dispatch<React.SetStateA
     const [client, updateClient] = useState(props.name)
 
     function onChange(e: React.ChangeEvent<HTMLInputElement>) {
-        updateClient(e.target.value)
+        clientName = e.target.value
+        updateClient(clientName)
     }
 
     function onUpdate() {
@@ -59,7 +60,7 @@ function NameView(props: { name: String, setName: React.Dispatch<React.SetStateA
 
     return (
         <>
-            <label htmlFor="listenerName">Your name:</label>
+            <h2>Please provide your name to the whisperer:</h2>
             <input
                 name="listenerName"
                 id="listenerName"

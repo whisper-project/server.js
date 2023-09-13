@@ -22099,24 +22099,19 @@ if (!$aabe4dd59eb48f51$var$publisherId || !$aabe4dd59eb48f51$var$publisherName |
 const $aabe4dd59eb48f51$var$channelName = `${$aabe4dd59eb48f51$var$publisherId}:whisper`;
 let $aabe4dd59eb48f51$var$resetInProgress = false;
 let $aabe4dd59eb48f51$var$presenceMessagesProcessed = 0;
-const $aabe4dd59eb48f51$var$disconnectedLiveText = "This is where live text will appear";
-const $aabe4dd59eb48f51$var$disconnectedPastText = "This is where past text will appear";
+const $aabe4dd59eb48f51$var$disconnectedText = {
+    live: "This is where live text will appear",
+    past: "This is where past text will appear"
+};
 function $aabe4dd59eb48f51$export$2e2bcd8739ae039() {
     const [whisperer, updateWhisperer] = (0, $dZtnC.useState)(`Connecting to ${$aabe4dd59eb48f51$var$publisherName}...`);
     const [client, updateClient] = (0, $dZtnC.useState)($aabe4dd59eb48f51$var$clientName);
-    const [liveText, updateLiveText] = (0, $dZtnC.useState)($aabe4dd59eb48f51$var$disconnectedLiveText);
-    function getLiveText() {
-        return liveText;
-    }
-    const [pastText, updatePastText] = (0, $dZtnC.useState)($aabe4dd59eb48f51$var$disconnectedPastText);
-    function getPastText() {
-        return pastText;
-    }
-    const [channel] = (0, $ee5486cf5f4bc1e1$exports.useChannel)($aabe4dd59eb48f51$var$channelName, (message)=>$aabe4dd59eb48f51$var$receiveChunk(message, channel, updateWhisperer, getLiveText, updateLiveText, getPastText, updatePastText));
+    const [text, updateText] = (0, $dZtnC.useState)($aabe4dd59eb48f51$var$disconnectedText);
+    const [channel] = (0, $ee5486cf5f4bc1e1$exports.useChannel)($aabe4dd59eb48f51$var$channelName, (message)=>$aabe4dd59eb48f51$var$receiveChunk(message, channel, updateWhisperer, updateText));
     const [presence, updatePresence] = (0, $79d1d236c59022a3$exports.usePresence)($aabe4dd59eb48f51$var$channelName, client);
     if (presence.length > $aabe4dd59eb48f51$var$presenceMessagesProcessed) {
         console.log(`Processing ${presence.length - $aabe4dd59eb48f51$var$presenceMessagesProcessed} presence messages`);
-        for(; $aabe4dd59eb48f51$var$presenceMessagesProcessed < presence.length; $aabe4dd59eb48f51$var$presenceMessagesProcessed++)$aabe4dd59eb48f51$var$receivePresence(presence[$aabe4dd59eb48f51$var$presenceMessagesProcessed], channel, updateLiveText, updatePastText, updateWhisperer);
+        for(; $aabe4dd59eb48f51$var$presenceMessagesProcessed < presence.length; $aabe4dd59eb48f51$var$presenceMessagesProcessed++)$aabe4dd59eb48f51$var$receivePresence(presence[$aabe4dd59eb48f51$var$presenceMessagesProcessed], channel, updateWhisperer, updateText);
     }
     return /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsxs)((0, $6ac8170ffe1babd5$exports.Fragment), {
         children: [
@@ -22130,11 +22125,8 @@ function $aabe4dd59eb48f51$export$2e2bcd8739ae039() {
                         updateClient: updateClient,
                         updatePresence: updatePresence
                     }),
-                    /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)($aabe4dd59eb48f51$var$LiveText, {
-                        liveText: liveText
-                    }),
-                    /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)($aabe4dd59eb48f51$var$PastText, {
-                        pastText: pastText
+                    /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)($aabe4dd59eb48f51$var$LivePastText, {
+                        text: text
                     })
                 ]
             })
@@ -22171,22 +22163,24 @@ function $aabe4dd59eb48f51$var$ClientName(props) {
         ]
     });
 }
-function $aabe4dd59eb48f51$var$LiveText(props) {
-    return /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)("textarea", {
-        id: "liveText",
-        rows: 25,
-        value: props.liveText
+function $aabe4dd59eb48f51$var$LivePastText(props) {
+    return /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsxs)((0, $6ac8170ffe1babd5$exports.Fragment), {
+        children: [
+            /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)("textarea", {
+                id: "liveText",
+                rows: 10,
+                value: props.text.live
+            }),
+            /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)("textarea", {
+                id: "pastText",
+                rows: 30,
+                readOnly: true,
+                value: props.text.past
+            })
+        ]
     });
 }
-function $aabe4dd59eb48f51$var$PastText(props) {
-    return /*#__PURE__*/ (0, $6ac8170ffe1babd5$exports.jsx)("textarea", {
-        id: "pastText",
-        rows: 25,
-        readOnly: true,
-        value: props.pastText
-    });
-}
-function $aabe4dd59eb48f51$var$receiveChunk(message, channel, updateWhisperer, getLiveText, updateLiveText, getPastText, updatePastText) {
+function $aabe4dd59eb48f51$var$receiveChunk(message, channel, updateWhisperer, updateText) {
     if (message.name.toUpperCase() === $aabe4dd59eb48f51$var$clientId.toUpperCase()) {
         console.log(`Received chunk directed here: ${message.data}`);
         const [offset, text] = message.data.split("|", 1);
@@ -22194,14 +22188,13 @@ function $aabe4dd59eb48f51$var$receiveChunk(message, channel, updateWhisperer, g
             console.log(`Whisperer is dropping this client`);
             channel.detach();
             updateWhisperer(`Dropped by ${$aabe4dd59eb48f51$var$publisherName}`);
-            updateLiveText($aabe4dd59eb48f51$var$disconnectedLiveText);
-            updatePastText($aabe4dd59eb48f51$var$disconnectedPastText);
-        } else $aabe4dd59eb48f51$var$processChunk(message.data, getLiveText, updateLiveText, getPastText, updatePastText);
-    } else if (message.name === "all") $aabe4dd59eb48f51$var$processChunk(message.data, getLiveText, updateLiveText, getPastText, updatePastText);
+            updateText($aabe4dd59eb48f51$var$disconnectedText);
+        } else $aabe4dd59eb48f51$var$processChunk(message.data, updateText);
+    } else if (message.name === "all") $aabe4dd59eb48f51$var$processChunk(message.data, updateText);
     else if (message.clientId.toUpperCase() != $aabe4dd59eb48f51$var$publisherId.toUpperCase()) console.log(`Ignoring chunk from non-listener ${message.clientId}, topic ${message.name}: ${message.data}`);
     else console.log(`Ignoring chunk with topic ${message.name}: ${message.data}`);
 }
-function $aabe4dd59eb48f51$var$receivePresence(message, channel, updateLiveText, updatePastText, updateWhisperer) {
+function $aabe4dd59eb48f51$var$receivePresence(message, channel, updateWhisperer, updateText) {
     if (message.clientId.toUpperCase() == $aabe4dd59eb48f51$var$clientId.toUpperCase()) console.log(`Ignoring self presence message: ${message.action}, ${message.data}`);
     else if (message.clientId.toUpperCase() === $aabe4dd59eb48f51$var$publisherId.toUpperCase()) {
         console.log(`Received presence from Whisperer: ${message.action}, ${message.data}`);
@@ -22213,30 +22206,31 @@ function $aabe4dd59eb48f51$var$receivePresence(message, channel, updateLiveText,
             $aabe4dd59eb48f51$var$publisherName = message.data;
             updateWhisperer(`Connected to ${$aabe4dd59eb48f51$var$publisherName}`);
             // auto-subscribe
-            $aabe4dd59eb48f51$var$readAllText(channel, updateLiveText, updatePastText);
+            $aabe4dd59eb48f51$var$readAllText(channel, updateText);
         } else if ([
             "leave",
             "absent"
         ].includes(message.action)) {
             $aabe4dd59eb48f51$var$publisherName = message.data;
             updateWhisperer(`Disconnected from ${$aabe4dd59eb48f51$var$publisherName}`);
-            updateLiveText($aabe4dd59eb48f51$var$disconnectedLiveText);
-            updatePastText($aabe4dd59eb48f51$var$disconnectedPastText);
+            updateText($aabe4dd59eb48f51$var$disconnectedText);
         }
     } else console.log(`Ignoring presence message: ${message.clientId}, ${message.data}, ${message.action}`);
 }
-function $aabe4dd59eb48f51$var$readAllText(channel, updateLiveText, updatePastText) {
+function $aabe4dd59eb48f51$var$readAllText(channel, updateText) {
     if ($aabe4dd59eb48f51$var$resetInProgress) // already reading all the text
     return;
     console.log("Requesting resend of all text...");
     $aabe4dd59eb48f51$var$resetInProgress = true;
     // reset the current text
-    updatePastText("");
-    updateLiveText("");
+    updateText({
+        live: "",
+        past: ""
+    });
     // request the whisperer to send all the text
     channel.publish($aabe4dd59eb48f51$var$publisherId, "-20|all");
 }
-function $aabe4dd59eb48f51$var$processChunk(chunk, getLiveText, updateLiveText, getPastText, updatePastText) {
+function $aabe4dd59eb48f51$var$processChunk(chunk, updateText) {
     function isDiff(chunk) {
         return chunk.startsWith("-1") || !chunk.startsWith("-");
     }
@@ -22244,27 +22238,56 @@ function $aabe4dd59eb48f51$var$processChunk(chunk, getLiveText, updateLiveText, 
     else if ($aabe4dd59eb48f51$var$resetInProgress) {
         if (chunk.startsWith("-4|")) {
             console.log("Received reset acknowledgement from whisperer, clearing past text");
-            updatePastText("");
+            updateText((text)=>{
+                return {
+                    live: text.live,
+                    past: ""
+                };
+            });
         } else if (isDiff(chunk)) console.log("Ignoring diff chunk because a read is in progress");
         else if (chunk.startsWith("-1|") || chunk.startsWith("-2|")) {
             console.log("Prepending past line chunk");
-            updatePastText(chunk.substring(3) + "\n" + getPastText());
+            updateText((text)=>{
+                return {
+                    live: text.live,
+                    past: chunk.substring(3) + "\n" + text.past
+                };
+            });
         } else if (chunk.startsWith("-3|")) {
             console.log("Receive live text chunk, update is over");
-            updateLiveText(chunk.substring(3));
+            updateText((text)=>{
+                return {
+                    live: chunk.substring(3),
+                    past: text.past
+                };
+            });
             $aabe4dd59eb48f51$var$resetInProgress = false;
         }
     } else {
         if (!isDiff(chunk)) console.log("Ignoring non-diff chunk because no read in progress");
-        else if (chunk.startsWith("0|")) updateLiveText(chunk.substring(3));
+        else if (chunk.startsWith("0|")) updateText((text)=>{
+            return {
+                live: chunk.substring(3),
+                past: text.past
+            };
+        });
         else if (chunk.startsWith("-1|")) {
             console.log("Prepending live text to past line");
-            updatePastText(getLiveText() + "\n" + getPastText());
-            updateLiveText("");
+            updateText((text)=>{
+                return {
+                    live: "",
+                    past: text.live + "\n" + text.past
+                };
+            });
         } else {
-            const [offsetDigits, text] = chunk.split("|", 1);
+            const [offsetDigits, suffix] = chunk.split("|", 1);
             const offset = parseInt(offsetDigits);
-            updateLiveText(getLiveText().substring(0, offset) + text);
+            updateText((text)=>{
+                return {
+                    live: text.live.substring(0, offset) + suffix,
+                    past: text.past
+                };
+            });
         }
     }
 }

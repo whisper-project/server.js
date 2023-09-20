@@ -24,39 +24,47 @@ export async function sendSecretToClient(clientKey: string, force: boolean = fal
         },
         "secret" : secret64,
     }
-    const response = await fetch(server + path, {
-        method: "POST",
-        mode: "same-origin",
-        cache: "no-cache",
-        credentials: "same-origin",
-        headers: {
-            'authorization': `Bearer ${await createApnsJwt()}`,
-            'apns-id': clientData.pushId!,
-            'apns-push-type': 'background',
-            'apns-priority': '5',
-            'apns-topic': 'io.clickonetwo.whisper'
-        },
-        redirect: 'error',
-        json: body,
-    });
-    const status = response.status
     const requestKey = `req:${clientData.pushId!}`
     const requestData: ApnsRequestData = {
         id: clientData.pushId!,
         clientKey,
-        status,
+        status: -1,
     }
-    const devId = response.headers.get('apns-unique-id')
-    if (devId) {
-        requestData.devId = devId
-    }
-    if (status >= 400) {
-        const body = await response.json()
-        requestData.reason = body.reason
-        if (body?.timestamp) {
-            requestData.timestamp = body.timestamp
+    try {
+        const response = await fetch(server + path, {
+            method: "POST",
+            mode: "same-origin",
+            cache: "no-cache",
+            credentials: "same-origin",
+            headers: {
+                'authorization': `Bearer ${await createApnsJwt()}`,
+                'apns-id': clientData.pushId!,
+                'apns-push-type': 'background',
+                'apns-priority': '5',
+                'apns-topic': 'io.clickonetwo.whisper'
+            },
+            redirect: 'error',
+            json: body,
+        });
+        requestData.status = response.status
+        const devId = response.headers.get('apns-unique-id')
+        if (devId) {
+            requestData.devId = devId
+        }
+        if (response.status >= 400) {
+            const body = await response.json()
+            requestData.reason = body.reason
+            console.log(`APNS post failed with status ${response.status} and reason: ${body.reason}`)
+            if (body?.timestamp) {
+                requestData.timestamp = body.timestamp
+            }
+        } else {
+            console.log(`APNS post completed with status ${response.status}`)
         }
     }
+    catch (err) {
+        console.log(`APNS post failed due to error: ${err}`)
+    }
     await setApnsRequestData(requestKey, requestData)
-    return status < 300
+    return requestData.status >= 200 && requestData.status < 300
 }

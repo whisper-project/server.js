@@ -43,7 +43,10 @@ function asyncWrapper(handler: Handler) {
         }
         catch (error) {
             console.log(`Route handler produced an error: ${error}`)
-            res.status(500).send({ status: 'error', reason: `Server error: ${error}`})
+            if (!res.headersSent) {
+                // make sure we send some response to the client, if it's not already gone
+                res.status(500).send({ status: 'error', reason: `Server error: ${error}`})
+            }
         }
     }
 }

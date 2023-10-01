@@ -4,7 +4,7 @@
 
 import express from 'express'
 
-import {ClientData, getClientData, setClientData} from './db.js'
+import {ClientData, getClientData, incrementErrorCounts, setClientData} from './db.js'
 import {sendSecretToClient} from './apns.js'
 import {createAblyPublishTokenRequest, createAblySubscribeTokenRequest, validateClientJwt} from './auth.js'
 import {randomUUID} from 'crypto'
@@ -65,6 +65,7 @@ export async function apnsToken(req: express.Request, res: express.Response)  {
     } else {
         console.log(`Received APNS token from unchanged client ${clientKey}${appInfo}`)
     }
+    await incrementErrorCounts(body)
     res.setHeader("Content-Type", "text/plain")
     res.status(204).send(appInfo)
     await sendSecretToClient(clientKey, clientChanged)

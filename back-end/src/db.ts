@@ -98,3 +98,14 @@ export async function setApnsRequestData(requestKey: string, data: ApnsRequestDa
     const rc = await getDb()
     await rc.hSet(dbKeyPrefix + requestKey, update)
 }
+
+export async function incrementErrorCounts(data: object) {
+    const db = await getDb()
+    for (const field in ['dropped', 'tcp', 'authentication']) {
+        const prop = field + 'ErrorCount'
+        const val = data[prop]
+        if (val && typeof val === 'number') {
+            await db.hIncrBy(dbKeyPrefix + 'errorCounts', field, val)
+        }
+    }
+}

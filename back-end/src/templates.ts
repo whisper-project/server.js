@@ -7,11 +7,11 @@ export function subscribe_response(publisher_name: string) {
             <html lang="en">
             <head>
                 <meta charset="UTF-8">
-                <title>Listening to ${publisher_name}</title>
+                <title>Listen to ${publisher_name}</title>
                 <meta http-equiv="refresh" content="2; url=/listen/index.html">
             </head>
             <body>
-                <h1>Listening to ${publisher_name}</h1>
+                <h1>Listen to ${publisher_name}</h1>
                 <p>The whisper server is preparing your connection.  Please wait...</p>
             </body>
             </html>`

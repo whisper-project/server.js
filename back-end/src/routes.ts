@@ -8,6 +8,7 @@ import {ClientData, getClientData, setClientData} from './db.js'
 import {sendSecretToClient} from './apns.js'
 import {createAblyPublishTokenRequest, createAblySubscribeTokenRequest, validateClientJwt} from './auth.js'
 import {randomUUID} from 'crypto'
+import {subscribe_response} from './templates.js';
 
 export async function apnsToken(req: express.Request, res: express.Response)  {
     const body: { [p: string]: string } = req.body
@@ -170,8 +171,8 @@ export async function subscribeToPublisher(req: express.Request, res: express.Re
     setCookie('publisherName', publisherName)
     setCookie('clientId', clientId)
     setCookie('clientName', req.cookies?.clientName || '')
-    res.setHeader('Location', `/listen/index.html`)
-    res.status(303).send()
+    const body = subscribe_response(publisherName)
+    res.status(200).send(body)
 }
 
 export async function subscribeTokenRequest(req: express.Request, res: express.Response) {

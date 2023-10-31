@@ -38,6 +38,7 @@ export interface ClientData {
     token?: string,
     tokenDate?: number
     lastSecret?: string
+    apnsLastSecret?: string
     secret?: string,
     secretDate?: number,
     pushId?: string,

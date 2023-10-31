@@ -39,8 +39,15 @@ export async function apnsToken(req: express.Request, res: express.Response)  {
         changeReason = "APNS token from new"
     }
     if (!clientChanged && received.lastSecret !== existing?.lastSecret) {
-        clientChanged = true
-        changeReason = "unconfirmed secret from existing"
+        // race condition: see issue #2
+        if (existing?.secretDate && existing?.apnsLastSecret && existing.apnsLastSecret === received.lastSecret) {
+            let elapsed = Date.now() - existing.secretDate!
+            console.warn(`Ignoring apns last secret posted ${elapsed} ms after confirmed update.`)
+        } else {
+            clientChanged = true
+            received.apnsLastSecret = received.lastSecret
+            changeReason = "unconfirmed secret from existing"
+       }
     }
     if (!clientChanged && received.token !== existing?.token) {
         clientChanged = true
@@ -180,7 +187,7 @@ export async function subscribeTokenRequest(req: express.Request, res: express.R
     const clientId = req?.session?.clientId
     const publisherId = req?.session?.publisherId
     if (!clientId || !publisherId) {
-        res.sendStatus(403).send({ status: 'error', reason: 'no session to support authentication' })
+        res.status(403).send({ status: 'error', reason: 'no session to support authentication' })
         return
     }
     const tokenRequest = await createAblySubscribeTokenRequest(clientId, publisherId)

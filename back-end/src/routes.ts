@@ -45,7 +45,6 @@ export async function apnsToken(req: express.Request, res: express.Response)  {
             console.warn(`Ignoring apns last secret posted ${elapsed} ms after confirmed update.`)
         } else {
             clientChanged = true
-            received.apnsLastSecret = received.lastSecret
             changeReason = "unconfirmed secret from existing"
        }
     }
@@ -68,6 +67,7 @@ export async function apnsToken(req: express.Request, res: express.Response)  {
     const appInfo = body?.appInfo ? ` (${body.appInfo})` : ''
     if (clientChanged) {
         console.log(`Received ${changeReason} client ${clientKey}${appInfo}`)
+        received.apnsLastSecret = received.lastSecret
         await setClientData(clientKey, received)
     } else {
         console.log(`Received APNS token from unchanged client ${clientKey}${appInfo}`)

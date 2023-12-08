@@ -8,7 +8,14 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "rm -f ../back-end/public/listen/* && parcel build --no-cache --no-source-maps"
+    "build": "rm -f ../back-end/public/listen/* && parcel build --no-cache --no-source-maps --no-optimize"
+  },
+  "dependencies": {
+    "@types/js-cookie": "^3.0.3",
+    "ably": "^1.2.48",
+    "js-cookie": "^3.0.5",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.21",
@@ -17,12 +24,5 @@
     "parcel": "^2.9.3",
     "process": "^0.11.10",
     "typescript": "^5.2.2"
-  },
-  "dependencies": {
-    "@ably-labs/react-hooks": "^2.1.1",
-    "@types/js-cookie": "^3.0.3",
-    "js-cookie": "^3.0.5",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
   }
 }

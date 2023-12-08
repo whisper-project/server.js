@@ -4,8 +4,8 @@
 
 import React, {useState} from 'react'
 import Cookies from 'js-cookie'
-import {configureAbly, useChannel, usePresence} from '@ably-labs/react-hooks'
-import {Types as Ably} from 'ably'
+import {AblyProvider, useChannel, usePresence} from 'ably/react'
+import * as Ably from 'ably'
 
 const publisherId = Cookies.get('publisherId') || ''
 let publisherName = Cookies.get('publisherName') || ''
@@ -16,7 +16,7 @@ if (!publisherId || !publisherName || !clientId) {
     window.location.href = "/subscribe404.html"
 }
 
-configureAbly({
+const client = new Ably.Realtime.Promise({
     clientId: clientId,
     authUrl: '/api/subscribeTokenRequest',
     echoMessages: false,
@@ -24,7 +24,6 @@ configureAbly({
 
 const channelName = `${publisherId}:whisper`
 let resetInProgress: boolean = false
-let processPastPresence = true
 
 interface Text {
     live: string,
@@ -39,7 +38,11 @@ const disconnectedText: Text = {
 export default function ListenerView() {
     const [listenerName, setListenerName] = useState(clientName)
     if (listenerName) {
-        return <ConnectionView />
+        return (
+            <AblyProvider client={client}>
+                <ConnectionView />
+            </AblyProvider>
+        )
     } else {
         return <NameView name={listenerName} setName={setListenerName} />
     }
@@ -82,21 +85,13 @@ function NameView(props: { name: String, setName: React.Dispatch<React.SetStateA
 function ConnectionView() {
     const [whisperer, updateWhisperer] = useState(`Connecting to ${publisherName}...`)
     const [text, updateText] = useState(disconnectedText)
-    const [channel] = useChannel(
+    const { channel } = useChannel(
         channelName,
         (message) => receiveChunk(message, channel, updateWhisperer, updateText))
-    const [presence] = usePresence(
-        channelName,
-        clientName,
-        (m) =>
-            receivePresence(m as Ably.PresenceMessage, channel, updateWhisperer, updateText))
-    if (processPastPresence) {
-        processPastPresence = false
-        console.log(`Processing ${presence.length} past presence messages`)
-        for (let i = 0; i < presence.length; i++) {
-            receivePresence(presence[i] as Ably.PresenceMessage, channel, updateWhisperer, updateText)
-        }
-    }
+    const { presenceData } = usePresence(channelName, clientName)
+    presenceData.map((message, index) => {
+        receivePresence(message as Ably.Types.PresenceMessage, index, channel, updateWhisperer, updateText)
+    })
     return (
         <>
             <PublisherName whisperer={whisperer}/>
@@ -129,8 +124,8 @@ function LivePastText(props: { text: Text }) {
     )
 }
 
-function receiveChunk(message: Ably.Message,
-                      channel: Ably.RealtimeChannelCallbacks,
+function receiveChunk(message: Ably.Types.Message,
+                      channel: Ably.Types.RealtimeChannelPromise,
                       updateWhisperer: React.Dispatch<React.SetStateAction<string>>,
                       updateText: React.Dispatch<React.SetStateAction<Text>>) {
     if (message.name.toUpperCase() === clientId.toUpperCase()) {
@@ -155,14 +150,15 @@ function receiveChunk(message: Ably.Message,
     }
 }
 
-function receivePresence(message: Ably.PresenceMessage,
-                         channel: Ably.RealtimeChannelCallbacks,
+function receivePresence(message: Ably.Types.PresenceMessage,
+                         index: number,
+                         channel: Ably.Types.RealtimeChannelPromise,
                          updateWhisperer: React.Dispatch<React.SetStateAction<string>>,
                          updateText: React.Dispatch<React.SetStateAction<Text>>) {
     if (message.clientId.toUpperCase() == clientId.toUpperCase()) {
-        console.log(`Ignoring self presence message: ${message.action}, ${message.data}`)
+        console.log(`Ignoring self presence message #${index}: ${message.action}, ${message.data}`)
     } else if (message.clientId.toUpperCase() === publisherId.toUpperCase()) {
-        console.log(`Received presence from Whisperer: ${message.action}, ${message.data}`)
+        console.log(`Received presence #${index} from Whisperer: ${message.action}, ${message.data}`)
         if (['present', 'enter', 'update'].includes(message.action)) {
             publisherName = message.data
             updateWhisperer(`Connected to ${publisherName}`)
@@ -174,11 +170,11 @@ function receivePresence(message: Ably.PresenceMessage,
             updateText(disconnectedText)
         }
     } else {
-        console.log(`Ignoring presence message: ${message.clientId}, ${message.data}, ${message.action}`)
+        console.log(`Ignoring presence message #${index}: ${message.clientId}, ${message.data}, ${message.action}`)
     }
 }
 
-function readLiveText(channel: Ably.RealtimeChannelCallbacks) {
+function readLiveText(channel: Ably.Types.RealtimeChannelPromise) {
     if (resetInProgress) {
         // already reading all the text
         return

@@ -6,7 +6,16 @@
              "components": [
                {
                   "/": "/subscribe/*",
-                  "comment": "Subscribe to a network-published whisperer."
+                  "comment": "Link to a network-published whisperer (v1)."
+               },
+               {
+                  "/": "/listen/index*.*",
+                  "exclude": true,
+                  "comment": "Web listener source file."
+               },
+               {
+                  "/": "/listen/*",
+                  "comment": "Link to a network-published whisperer (v2)."
                },
                {
                   "/": "/web/*",

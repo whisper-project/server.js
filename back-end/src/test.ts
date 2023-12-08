@@ -2,24 +2,19 @@
 // Licensed under the GNU Affero General Public License v3.
 // See the LICENSE file for details.
 
-import assert from 'assert'
 import {randomUUID} from 'crypto'
+import assert from 'assert'
 import express from 'express'
 
-
-import {
-    createAblyPublishTokenRequest, createAblySubscribeTokenRequest,
-    createApnsJwt,
-    createClientJwt,
-    makeNonce,
-    validateApnsJwt,
-    validateClientJwt
-} from "./auth.js";
-import {ClientData, getApnsRequestData, getClientData, getDb, setClientData} from './db.js'
+import {createApnsJwt, createClientJwt, makeNonce, validateApnsJwt, validateClientJwt} from "./auth.js";
+import {getDb} from './db.js'
 import {loadSettings} from './settings.js'
-import {sendSecretToClient} from './apns.js'
+import {ClientData, getClientData, setClientData} from './client.js'
+import {getApnsRequestData, sendSecretToClient} from './apns.js'
 
-async function createTestClient() {
+import {testAll as test1} from './v1/test.js'
+
+export async function createTestClient() {
     const uuid = randomUUID()
     const clientKey = `tcl:${uuid}`
     const clientData: ClientData = {
@@ -33,14 +28,6 @@ async function createTestClient() {
     }
     await setClientData(clientKey, clientData)
     return clientKey
-}
-
-async function deleteTestKeys() {
-    const rc = await getDb()
-    const keys = await rc.keys('t:*')
-    if (keys.length) {
-        await rc.del(keys)
-    }
 }
 
 async function testJwt() {
@@ -99,21 +86,17 @@ async function mockApnsRoute(req: express.Request, res: express.Response) {
     res.status(200).send()
 }
 
-async function testAbly() {
-    const clientKey1 = await createTestClient()
-    const clientData1 = await getClientData(clientKey1)
-    const tokenRequest1 = await createAblyPublishTokenRequest(clientData1!.id)
-    console.log(`Created publish token request: ${JSON.stringify(tokenRequest1)}`)
-    const clientKey2 = await createTestClient()
-    const clientData2 = await getClientData(clientKey2)
-    const tokenRequest2 = await createAblySubscribeTokenRequest(clientData2!.id, clientData1!.id)
-    console.log(`Created subscribe token request: ${JSON.stringify(tokenRequest2)}`)
+async function deleteTestKeys() {
+    const rc = await getDb()
+    const keys = await rc.keys('t:*')
+    if (keys.length) {
+        await rc.del(keys)
+    }
 }
 
-async function testAll(...tests: string[]) {
-    loadSettings('test')
+async function test0(...tests: string[]) {
     if (tests.length == 0) {
-        tests = ['jwt', 'apns', 'ably']
+        tests = ['jwt', 'apns']
     }
     if (tests.includes('jwt')) {
         await testJwt()
@@ -121,11 +104,17 @@ async function testAll(...tests: string[]) {
     if (tests.includes('apns')) {
         await testApns()
     }
-    if (tests.includes('ably')) {
-        await testAbly()
-    }
+}
+
+async function testAll(...tests: string[]) {
+    loadSettings('test')
+    await test0(...tests)
+    await test1(...tests)
     await deleteTestKeys()
 }
 
 testAll(...process.argv.slice(2))
-    .then(() => console.log("Tests completed with no errors"))
+    .then(() => {
+        console.log("Tests completed with no errors")
+        process.exit(0)
+    })

@@ -94,7 +94,7 @@ function ConnectionView() {
         console.log("Received new presence messages")
         const newMessages = presenceData.slice(presenceIndex)
         presenceIndex = presenceData.length
-        presenceData.map(message => {
+        newMessages.map(message => {
             receivePresence(message as Ably.Types.PresenceMessage, channel, updateWhisperer, updateText)
         })
     }

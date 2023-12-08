@@ -22640,7 +22640,7 @@ function $d1b00e9b3db9f67e$var$ConnectionView() {
         console.log("Received new presence messages");
         const newMessages = presenceData.slice($d1b00e9b3db9f67e$var$presenceIndex);
         $d1b00e9b3db9f67e$var$presenceIndex = presenceData.length;
-        presenceData.map((message)=>{
+        newMessages.map((message)=>{
             $d1b00e9b3db9f67e$var$receivePresence(message, channel, updateWhisperer, updateText);
         });
     }

@@ -1,14 +1,14 @@
 {
   "targets": {
     "default": {
-      "source": "src/index.html",
+      "source": "src/index1.html",
       "distDir": "../back-end/public/listen",
       "publicUrl": "/listen"
     }
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "rm -f ../back-end/public/listen/* && parcel build --no-cache --no-source-maps --no-optimize"
+    "build": "rm -f ../back-end/public/listen/* && parcel build --no-cache --no-source-maps"
   },
   "devDependencies": {
     "@types/react": "^18.2.21",

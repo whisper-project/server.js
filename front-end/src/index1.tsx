@@ -5,7 +5,7 @@
 import React, { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
-import App from "./subscribe"
+import App from "./subscribe1"
 
 // @ts-ignore
 const root = createRoot(document.getElementById("root"))

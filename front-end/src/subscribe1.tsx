@@ -24,7 +24,7 @@ configureAbly({
 
 const channelName = `${publisherId}:whisper`
 let resetInProgress: boolean = false
-let presenceMessagesProcessed = 0
+let processPastPresence = true
 
 interface Text {
     live: string,
@@ -85,16 +85,18 @@ function ConnectionView() {
     const [channel] = useChannel(
         channelName,
         (message) => receiveChunk(message, channel, updateWhisperer, updateText))
-    const [presence] = usePresence(channelName, clientName)
-    if (presence.length > presenceMessagesProcessed) {
-        console.log(`Processing ${presence.length - presenceMessagesProcessed} presence messages`)
-        for (; presenceMessagesProcessed < presence.length; presenceMessagesProcessed++) {
-            receivePresence(
-                presence[presenceMessagesProcessed] as Ably.PresenceMessage,
-                channel, updateWhisperer, updateText)
+    const [presence] = usePresence(
+        channelName,
+        clientName,
+        (m) =>
+            receivePresence(m as Ably.PresenceMessage, channel, updateWhisperer, updateText))
+    if (processPastPresence) {
+        processPastPresence = false
+        console.log(`Processing ${presence.length} past presence messages`)
+        for (let i = 0; i < presence.length; i++) {
+            receivePresence(presence[i] as Ably.PresenceMessage, channel, updateWhisperer, updateText)
         }
     }
-
     return (
         <>
             <PublisherName whisperer={whisperer}/>
@@ -137,7 +139,7 @@ function receiveChunk(message: Ably.Message,
         if (offset === "-21" && text.toUpperCase() === clientId.toUpperCase()) {
             console.log(`Whisperer is dropping this client`)
             channel.detach()
-            updateWhisperer(`Dropped by ${publisherName}`)
+            updateWhisperer(`Dropped by ${publisherName}, please close the window`)
             updateText(disconnectedText)
         } else {
             processChunk(message.data as string, updateText)
@@ -165,10 +167,10 @@ function receivePresence(message: Ably.PresenceMessage,
             publisherName = message.data
             updateWhisperer(`Connected to ${publisherName}`)
             // auto-subscribe
-            readAllText(channel, updateText)
+            readLiveText(channel)
         } else if (['leave', 'absent'].includes(message.action)) {
             publisherName = message.data
-            updateWhisperer(`Disconnected from ${publisherName}`)
+            updateWhisperer(`Disconnected from ${publisherName}, please close the window`)
             updateText(disconnectedText)
         }
     } else {
@@ -176,18 +178,15 @@ function receivePresence(message: Ably.PresenceMessage,
     }
 }
 
-function readAllText(channel: Ably.RealtimeChannelCallbacks,
-                     updateText: React.Dispatch<React.SetStateAction<Text>>) {
+function readLiveText(channel: Ably.RealtimeChannelCallbacks) {
     if (resetInProgress) {
         // already reading all the text
         return
     }
-    console.log("Requesting resend of all text...")
+    console.log("Requesting resend of live text...")
     resetInProgress = true
-    // reset the current text
-    updateText({ live: '', past: '' })
     // request the whisperer to send all the text
-    channel.publish(publisherId, "-20|all")
+    channel.publish(publisherId, "-20|live")
 }
 
 function processChunk(chunk: string,
@@ -199,17 +198,14 @@ function processChunk(chunk: string,
         console.log("Received request to play sound")
     } else if (resetInProgress) {
         if (chunk.startsWith('-4|')) {
-            console.log("Received reset acknowledgement from whisperer, clearing past text")
+            console.log("Received reset acknowledgement from whisperer, resetting live text")
             updateText((text: Text) => {
-                return { live: text.live, past: '' }
+                return { live: '', past: text.past }
             })
         } else if (isDiff(chunk)) {
             console.log("Ignoring diff chunk because a read is in progress")
         } else if (chunk.startsWith('-1|') || chunk.startsWith('-2|')) {
-            console.log("Prepending past line chunk")
-            updateText((text: Text) => {
-                return { live: text.live, past: chunk.substring(3) + '\n' + text.past }
-            })
+            console.log("Received unexpected past line chunk, ignoring it")
         } else if (chunk.startsWith('-3|')) {
             console.log("Receive live text chunk, update is over")
             updateText((text: Text) => {

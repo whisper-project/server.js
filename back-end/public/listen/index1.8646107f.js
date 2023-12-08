@@ -22582,6 +22582,7 @@ const $d1b00e9b3db9f67e$var$client = new $2TIC1.Realtime.Promise({
 });
 const $d1b00e9b3db9f67e$var$channelName = `${$d1b00e9b3db9f67e$var$publisherId}:whisper`;
 let $d1b00e9b3db9f67e$var$resetInProgress = false;
+let $d1b00e9b3db9f67e$var$presenceIndex = 0;
 const $d1b00e9b3db9f67e$var$disconnectedText = {
     live: "This is where live text will appear",
     past: "This is where past text will appear.\nThe newest lines will appear on top."
@@ -22635,9 +22636,14 @@ function $d1b00e9b3db9f67e$var$ConnectionView() {
     const [text, updateText] = (0, $dZtnC.useState)($d1b00e9b3db9f67e$var$disconnectedText);
     const { channel: channel } = (0, $58cb1f7f14ca7e3f$exports.useChannel)($d1b00e9b3db9f67e$var$channelName, (message)=>$d1b00e9b3db9f67e$var$receiveChunk(message, channel, updateWhisperer, updateText));
     const { presenceData: presenceData } = (0, $58cb1f7f14ca7e3f$exports.usePresence)($d1b00e9b3db9f67e$var$channelName, $d1b00e9b3db9f67e$var$clientName);
-    presenceData.map((message, index)=>{
-        $d1b00e9b3db9f67e$var$receivePresence(message, index, channel, updateWhisperer, updateText);
-    });
+    if (presenceData.length > $d1b00e9b3db9f67e$var$presenceIndex) {
+        console.log("Received new presence messages");
+        const newMessages = presenceData.slice($d1b00e9b3db9f67e$var$presenceIndex);
+        $d1b00e9b3db9f67e$var$presenceIndex = presenceData.length;
+        presenceData.map((message)=>{
+            $d1b00e9b3db9f67e$var$receivePresence(message, channel, updateWhisperer, updateText);
+        });
+    }
     return /*#__PURE__*/ (0, $9aoy4.jsxs)((0, $9aoy4.Fragment), {
         children: [
             /*#__PURE__*/ (0, $9aoy4.jsx)($d1b00e9b3db9f67e$var$PublisherName, {
@@ -22687,10 +22693,10 @@ function $d1b00e9b3db9f67e$var$receiveChunk(message, channel, updateWhisperer, u
     else if (message.clientId.toUpperCase() != $d1b00e9b3db9f67e$var$publisherId.toUpperCase()) console.log(`Ignoring chunk from non-listener ${message.clientId}, topic ${message.name}: ${message.data}`);
     else console.log(`Ignoring chunk with topic ${message.name}: ${message.data}`);
 }
-function $d1b00e9b3db9f67e$var$receivePresence(message, index, channel, updateWhisperer, updateText) {
-    if (message.clientId.toUpperCase() == $d1b00e9b3db9f67e$var$clientId.toUpperCase()) console.log(`Ignoring self presence message #${index}: ${message.action}, ${message.data}`);
+function $d1b00e9b3db9f67e$var$receivePresence(message, channel, updateWhisperer, updateText) {
+    if (message.clientId.toUpperCase() == $d1b00e9b3db9f67e$var$clientId.toUpperCase()) console.log(`Ignoring self presence message: ${message.action}, ${message.data}`);
     else if (message.clientId.toUpperCase() === $d1b00e9b3db9f67e$var$publisherId.toUpperCase()) {
-        console.log(`Received presence #${index} from Whisperer: ${message.action}, ${message.data}`);
+        console.log(`Received presence from Whisperer: ${message.action}, ${message.data}`);
         if ([
             "present",
             "enter",
@@ -22708,7 +22714,7 @@ function $d1b00e9b3db9f67e$var$receivePresence(message, index, channel, updateWh
             updateWhisperer(`Disconnected from ${$d1b00e9b3db9f67e$var$publisherName}, please close the window`);
             updateText($d1b00e9b3db9f67e$var$disconnectedText);
         }
-    } else console.log(`Ignoring presence message #${index}: ${message.clientId}, ${message.data}, ${message.action}`);
+    } else console.log(`Ignoring presence message: ${message.clientId}, ${message.data}, ${message.action}`);
 }
 function $d1b00e9b3db9f67e$var$readLiveText(channel) {
     if ($d1b00e9b3db9f67e$var$resetInProgress) // already reading all the text

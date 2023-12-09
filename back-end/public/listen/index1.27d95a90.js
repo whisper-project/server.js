@@ -22595,7 +22595,7 @@ function $d1b00e9b3db9f67e$export$2e2bcd8739ae039() {
     const [connection, setConnection] = (0, $dZtnC.useState)("waiting");
     const [listenerName, setListenerName] = (0, $dZtnC.useState)($d1b00e9b3db9f67e$var$clientName);
     if (connection == "disconnected") return /*#__PURE__*/ (0, $9aoy4.jsx)($d1b00e9b3db9f67e$var$DisconnectedView, {
-        name: listenerName
+        name: $d1b00e9b3db9f67e$var$publisherName
     });
     else if (listenerName) return /*#__PURE__*/ (0, $9aoy4.jsx)((0, $58cb1f7f14ca7e3f$exports.AblyProvider), {
         client: $d1b00e9b3db9f67e$var$client,

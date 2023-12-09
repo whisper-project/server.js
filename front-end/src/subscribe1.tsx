@@ -45,7 +45,7 @@ export default function ListenerView() {
     const [connection, setConnection] = useState("waiting")
     const [listenerName, setListenerName] = useState(clientName)
     if (connection == "disconnected") {
-        return <DisconnectedView name={listenerName} />
+        return <DisconnectedView name={publisherName} />
     } else if (listenerName) {
         return (
             <AblyProvider client={client}>

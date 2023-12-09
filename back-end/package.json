@@ -6,7 +6,7 @@
   "license": "AGPL v3",
   "type": "module",
   "engines": {
-    "node": "18.x"
+    "node": "20.x"
   },
   "main": "dist/server.js",
   "scripts": {
@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@types/cookie-session": "^2.0.45",
-    "ably": "^1.2.43",
+    "ably": "^1.2.48",
     "cookie-parser": "^1.4.6",
     "cookie-session": "^2.0.0",
     "dotenv": "^16.3.1",
@@ -33,6 +33,6 @@
     "@typescript-eslint/eslint-plugin": "^6.1.0",
     "@typescript-eslint/parser": "^6.1.0",
     "eslint": "^8.45.0",
-    "typescript": "^5.1.6"
+    "typescript": "^5.3.3"
   }
 }

@@ -3,10 +3,9 @@
 // See the LICENSE file for details.
 
 import * as jose from 'jose'
-import * as Ably from 'ably/promises.js'
 import {randomBytes, randomUUID} from 'crypto';
 
-import {ClientData, getClientData, setClientData} from './db.js'
+import {ClientData, getClientData, setClientData} from './client.js'
 import {getSettings} from './settings.js'
 
 export async function createApnsJwt() {
@@ -117,28 +116,4 @@ export async function refreshSecret(clientKey: string, force: boolean = false) {
 
 export async function makeNonce() {
     return randomBytes(32).toString('hex')
-}
-
-export async function createAblyPublishTokenRequest(clientId: string) {
-    const config = getSettings()
-    const ably = new Ably.Rest({ key: config.ablyPublishKey })
-    const tokenCaps = {}
-    tokenCaps[`${clientId}:whisper`] = ['publish', 'subscribe', 'presence']
-    const tokenParams = {
-        clientId,
-        capability: JSON.stringify(tokenCaps)
-    }
-    return await ably.auth.createTokenRequest(tokenParams)
-}
-
-export async function createAblySubscribeTokenRequest(clientId: string, publisherId: string) {
-    const config = getSettings()
-    const ably = new Ably.Rest({ key: config.ablyPublishKey })
-    const tokenCaps = {}
-    tokenCaps[`${publisherId}:whisper`] = ['publish', 'subscribe', 'presence']
-    const tokenParams = {
-        clientId,
-        capability: JSON.stringify(tokenCaps)
-    }
-    return await ably.auth.createTokenRequest(tokenParams)
 }

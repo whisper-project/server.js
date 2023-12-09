@@ -16,6 +16,7 @@ interface Settings {
 }
 
 let loadedConfig: Settings | undefined
+let loadedConfigName: string | undefined
 
 export function getSettings() {
     if (!loadedConfig) {
@@ -25,6 +26,12 @@ export function getSettings() {
 }
 
 export function loadSettings(name: string = 'env') {
+    if (loadedConfigName) {
+        if (name !== loadedConfigName) {
+            throw Error(`Config ${loadedConfigName} already loaded: can't load ${name}`)
+        }
+        return
+    }
     name = name.toLowerCase()
     if (name === 'env') {
         config()

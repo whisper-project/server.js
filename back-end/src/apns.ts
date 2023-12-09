@@ -4,8 +4,38 @@
 
 import {fetch} from 'fetch-h2'
 import {createApnsJwt, refreshSecret} from './auth.js'
-import {ApnsRequestData, setApnsRequestData} from './db.js'
 import {getSettings} from './settings.js'
+import {dbKeyPrefix, getDb} from './db.js'
+
+interface ApnsRequestData {
+    id: string,
+    clientKey: string,
+    status: number,
+    devId?: string,
+    reason?: string,
+    timestamp?: number
+}
+
+export async function getApnsRequestData(requestKey: string) {
+    const db = await getDb()
+    const existing: {[index:string]: string | number} = await db.hGetAll(dbKeyPrefix + requestKey)
+    if (!existing?.id) {
+        return undefined
+    }
+    if (typeof existing?.status === 'string') {
+        existing.status = parseInt(existing.status)
+    }
+    return existing as unknown as ApnsRequestData
+}
+
+export async function setApnsRequestData(requestKey: string, data: ApnsRequestData) {
+    const update = {}
+    for (const key in data) {
+        update[key] = data[key].toString()
+    }
+    const rc = await getDb()
+    await rc.hSet(dbKeyPrefix + requestKey, update)
+}
 
 export async function sendSecretToClient(clientKey: string, force: boolean = false) {
     const config = getSettings()

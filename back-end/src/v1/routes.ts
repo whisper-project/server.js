@@ -3,12 +3,15 @@
 // See the LICENSE file for details.
 
 import express from 'express'
-
-import {ClientData, getClientData, incrementErrorCounts, setClientData} from './db.js'
-import {sendSecretToClient} from './apns.js'
-import {createAblyPublishTokenRequest, createAblySubscribeTokenRequest, validateClientJwt} from './auth.js'
 import {randomUUID} from 'crypto'
-import {subscribe_response} from './templates.js';
+
+import {createAblyPublishTokenRequest, createAblySubscribeTokenRequest} from './auth.js'
+import {subscribe_response} from './templates.js'
+
+import {incrementErrorCounts} from '../db.js'
+import {ClientData, getClientData, setClientData} from '../client.js'
+import {sendSecretToClient} from '../apns.js'
+import {validateClientJwt} from '../auth.js'
 
 export async function apnsToken(req: express.Request, res: express.Response)  {
     const body: { [p: string]: string } = req.body
@@ -41,7 +44,7 @@ export async function apnsToken(req: express.Request, res: express.Response)  {
     if (!clientChanged && received.lastSecret !== existing?.lastSecret) {
         // race condition: see issue #2
         if (existing?.secretDate && existing?.apnsLastSecret && existing.apnsLastSecret === received.lastSecret) {
-            let elapsed = Date.now() - existing.secretDate!
+            const elapsed = Date.now() - existing.secretDate!
             console.warn(`Ignoring apns last secret posted ${elapsed} ms after confirmed update.`)
         } else {
             clientChanged = true

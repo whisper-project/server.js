@@ -22581,17 +22581,27 @@ const $d1b00e9b3db9f67e$var$client = new $2TIC1.Realtime.Promise({
     echoMessages: false
 });
 const $d1b00e9b3db9f67e$var$channelName = `${$d1b00e9b3db9f67e$var$publisherId}:whisper`;
+let $d1b00e9b3db9f67e$var$hasConnected = false;
 let $d1b00e9b3db9f67e$var$resetInProgress = false;
-let $d1b00e9b3db9f67e$var$presenceIndex = 0;
-const $d1b00e9b3db9f67e$var$disconnectedText = {
+const $d1b00e9b3db9f67e$var$waitingToConnectText = {
     live: "This is where live text will appear",
     past: "This is where past text will appear.\nThe newest lines will appear on top."
 };
+const $d1b00e9b3db9f67e$var$connectedText = {
+    live: "",
+    past: ""
+};
 function $d1b00e9b3db9f67e$export$2e2bcd8739ae039() {
+    const [connection, setConnection] = (0, $dZtnC.useState)("waiting");
     const [listenerName, setListenerName] = (0, $dZtnC.useState)($d1b00e9b3db9f67e$var$clientName);
-    if (listenerName) return /*#__PURE__*/ (0, $9aoy4.jsx)((0, $58cb1f7f14ca7e3f$exports.AblyProvider), {
+    if (connection == "disconnected") return /*#__PURE__*/ (0, $9aoy4.jsx)($d1b00e9b3db9f67e$var$DisconnectedView, {
+        name: listenerName
+    });
+    else if (listenerName) return /*#__PURE__*/ (0, $9aoy4.jsx)((0, $58cb1f7f14ca7e3f$exports.AblyProvider), {
         client: $d1b00e9b3db9f67e$var$client,
-        children: /*#__PURE__*/ (0, $9aoy4.jsx)($d1b00e9b3db9f67e$var$ConnectionView, {})
+        children: /*#__PURE__*/ (0, $9aoy4.jsx)($d1b00e9b3db9f67e$var$ConnectionView, {
+            setConnection: setConnection
+        })
     });
     else return /*#__PURE__*/ (0, $9aoy4.jsx)($d1b00e9b3db9f67e$var$NameView, {
         name: listenerName,
@@ -22631,19 +22641,35 @@ function $d1b00e9b3db9f67e$var$NameView(props) {
         ]
     });
 }
-function $d1b00e9b3db9f67e$var$ConnectionView() {
+function $d1b00e9b3db9f67e$var$DisconnectedView(props) {
+    return /*#__PURE__*/ (0, $9aoy4.jsxs)((0, $9aoy4.Fragment), {
+        children: [
+            /*#__PURE__*/ (0, $9aoy4.jsxs)("h1", {
+                children: [
+                    props.name,
+                    " has stopped whispering"
+                ]
+            }),
+            /*#__PURE__*/ (0, $9aoy4.jsxs)("p", {
+                children: [
+                    "You can close this window or ",
+                    /*#__PURE__*/ (0, $9aoy4.jsx)("a", {
+                        href: "/listen/index1.html",
+                        children: "click here to reconnect"
+                    }),
+                    "."
+                ]
+            })
+        ]
+    });
+}
+function $d1b00e9b3db9f67e$var$ConnectionView(props) {
     const [whisperer, updateWhisperer] = (0, $dZtnC.useState)(`Connecting to ${$d1b00e9b3db9f67e$var$publisherName}...`);
-    const [text, updateText] = (0, $dZtnC.useState)($d1b00e9b3db9f67e$var$disconnectedText);
-    const { channel: channel } = (0, $58cb1f7f14ca7e3f$exports.useChannel)($d1b00e9b3db9f67e$var$channelName, (message)=>$d1b00e9b3db9f67e$var$receiveChunk(message, channel, updateWhisperer, updateText));
-    const { presenceData: presenceData } = (0, $58cb1f7f14ca7e3f$exports.usePresence)($d1b00e9b3db9f67e$var$channelName, $d1b00e9b3db9f67e$var$clientName);
-    if (presenceData.length > $d1b00e9b3db9f67e$var$presenceIndex) {
-        console.log("Received new presence messages");
-        const newMessages = presenceData.slice($d1b00e9b3db9f67e$var$presenceIndex);
-        $d1b00e9b3db9f67e$var$presenceIndex = presenceData.length;
-        newMessages.map((message)=>{
-            $d1b00e9b3db9f67e$var$receivePresence(message, channel, updateWhisperer, updateText);
-        });
-    }
+    const [text, updateText] = (0, $dZtnC.useState)($d1b00e9b3db9f67e$var$waitingToConnectText);
+    const { channel: channel } = (0, $58cb1f7f14ca7e3f$exports.useChannel)($d1b00e9b3db9f67e$var$channelName, (message)=>$d1b00e9b3db9f67e$var$receiveChunk(message, channel, props.setConnection, updateWhisperer, updateText));
+    (0, $58cb1f7f14ca7e3f$exports.usePresence)($d1b00e9b3db9f67e$var$channelName, $d1b00e9b3db9f67e$var$clientName, (message)=>{
+        $d1b00e9b3db9f67e$var$receivePresence(message, channel, props.setConnection, updateWhisperer, updateText);
+    });
     return /*#__PURE__*/ (0, $9aoy4.jsxs)((0, $9aoy4.Fragment), {
         children: [
             /*#__PURE__*/ (0, $9aoy4.jsx)($d1b00e9b3db9f67e$var$PublisherName, {
@@ -22679,21 +22705,20 @@ function $d1b00e9b3db9f67e$var$LivePastText(props) {
         ]
     });
 }
-function $d1b00e9b3db9f67e$var$receiveChunk(message, channel, updateWhisperer, updateText) {
+function $d1b00e9b3db9f67e$var$receiveChunk(message, channel, setConnection, updateWhisperer, updateText) {
+    $d1b00e9b3db9f67e$var$maybeConnect("content", channel, setConnection, updateWhisperer, updateText);
     if (message.name.toUpperCase() === $d1b00e9b3db9f67e$var$clientId.toUpperCase()) {
         console.log(`Received chunk directed here: ${message.data}`);
-        const [offset, text] = message.data.split("|", 1);
+        const [offset, text] = message.data.split("|", 2);
         if (offset === "-21" && text.toUpperCase() === $d1b00e9b3db9f67e$var$clientId.toUpperCase()) {
             console.log(`Whisperer is dropping this client`);
-            channel.detach();
-            updateWhisperer(`Dropped by ${$d1b00e9b3db9f67e$var$publisherName}, please close the window`);
-            updateText($d1b00e9b3db9f67e$var$disconnectedText);
+            $d1b00e9b3db9f67e$var$disconnect("content", channel, setConnection, updateWhisperer);
         } else $d1b00e9b3db9f67e$var$processChunk(message.data, updateText);
     } else if (message.name === "all") $d1b00e9b3db9f67e$var$processChunk(message.data, updateText);
     else if (message.clientId.toUpperCase() != $d1b00e9b3db9f67e$var$publisherId.toUpperCase()) console.log(`Ignoring chunk from non-listener ${message.clientId}, topic ${message.name}: ${message.data}`);
     else console.log(`Ignoring chunk with topic ${message.name}: ${message.data}`);
 }
-function $d1b00e9b3db9f67e$var$receivePresence(message, channel, updateWhisperer, updateText) {
+function $d1b00e9b3db9f67e$var$receivePresence(message, channel, setConnection, updateWhisperer, updateText) {
     if (message.clientId.toUpperCase() == $d1b00e9b3db9f67e$var$clientId.toUpperCase()) console.log(`Ignoring self presence message: ${message.action}, ${message.data}`);
     else if (message.clientId.toUpperCase() === $d1b00e9b3db9f67e$var$publisherId.toUpperCase()) {
         console.log(`Received presence from Whisperer: ${message.action}, ${message.data}`);
@@ -22703,18 +22728,28 @@ function $d1b00e9b3db9f67e$var$receivePresence(message, channel, updateWhisperer
             "update"
         ].includes(message.action)) {
             $d1b00e9b3db9f67e$var$publisherName = message.data;
-            updateWhisperer(`Connected to ${$d1b00e9b3db9f67e$var$publisherName}`);
-            // auto-subscribe
-            $d1b00e9b3db9f67e$var$readLiveText(channel);
+            $d1b00e9b3db9f67e$var$maybeConnect("presence", channel, setConnection, updateWhisperer, updateText);
         } else if ([
             "leave",
             "absent"
-        ].includes(message.action)) {
-            $d1b00e9b3db9f67e$var$publisherName = message.data;
-            updateWhisperer(`Disconnected from ${$d1b00e9b3db9f67e$var$publisherName}, please close the window`);
-            updateText($d1b00e9b3db9f67e$var$disconnectedText);
-        }
+        ].includes(message.action)) $d1b00e9b3db9f67e$var$disconnect("presence", channel, setConnection, updateWhisperer);
     } else console.log(`Ignoring presence message: ${message.clientId}, ${message.data}, ${message.action}`);
+}
+function $d1b00e9b3db9f67e$var$maybeConnect(messageType, channel, setConnection, updateWhisperer, updateText) {
+    if (!$d1b00e9b3db9f67e$var$hasConnected) {
+        $d1b00e9b3db9f67e$var$hasConnected = true;
+        console.log(`Connecting due to first message of type ${messageType}`);
+        setConnection("connected");
+        updateWhisperer(`Connected to ${$d1b00e9b3db9f67e$var$publisherName}`);
+        updateText($d1b00e9b3db9f67e$var$connectedText);
+        $d1b00e9b3db9f67e$var$readLiveText(channel);
+    }
+}
+function $d1b00e9b3db9f67e$var$disconnect(messageType, channel, setConnection, updateWhisperer) {
+    console.log(`Disconnecting due to message of type: ${messageType}`);
+    setConnection("disconnected");
+    updateWhisperer(`Disconnected from ${$d1b00e9b3db9f67e$var$publisherName}`);
+    channel.detach();
 }
 function $d1b00e9b3db9f67e$var$readLiveText(channel) {
     if ($d1b00e9b3db9f67e$var$resetInProgress) // already reading all the text

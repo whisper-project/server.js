@@ -42,3 +42,46 @@ export async function setClientData(clientKey: string, clientData: ClientData) {
     const rc = await getDb()
     await rc.hSet(dbKeyPrefix + clientKey, update)
 }
+
+export interface HasClientChanged {
+    clientChanged: boolean
+    changeReason: string
+}
+
+export async function hasClientChanged(clientKey: string, received: ClientData) {
+    const existing = await getClientData(clientKey)
+    // see refreshSecret for explanation of logic around lastSecret
+    let clientChanged = false
+    let changeReason = ""
+    if (!existing) {
+        clientChanged = true
+        changeReason = "APNS token from new"
+    }
+    if (!clientChanged && received.lastSecret !== existing?.lastSecret) {
+        // race condition: see issue #2
+        if (existing?.secretDate && existing?.apnsLastSecret && existing.apnsLastSecret === received.lastSecret) {
+            const elapsed = Date.now() - existing.secretDate!
+            console.warn(`Ignoring apns last secret posted ${elapsed} ms after confirmed update.`)
+        } else {
+            clientChanged = true
+            changeReason = "unconfirmed secret from existing"
+        }
+    }
+    if (!clientChanged && received.token !== existing?.token) {
+        clientChanged = true
+        changeReason = "new APNS token from existing"
+    }
+    if (!clientChanged && received.deviceId !== existing?.deviceId) {
+        clientChanged = true
+        changeReason = "new device ID from existing"
+    }
+    if (!clientChanged && received.userName !== existing?.userName) {
+        clientChanged = true
+        changeReason = "new user data from existing"
+    }
+    if (!clientChanged && received.appInfo !== existing?.appInfo) {
+        clientChanged = true
+        changeReason = "new build data from existing"
+    }
+    return {clientChanged, changeReason} as HasClientChanged
+}

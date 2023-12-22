@@ -8,9 +8,9 @@ import {pubSubTokenRequest, subscribeTokenRequest,} from './routes.js';
 import {asyncWrapper, sessionMiddleware} from '../middleware.js'
 import {apnsReceivedNotification, apnsToken} from '../routes.js'
 
-export const v1router = express.Router()
+export const v2router = express.Router()
 
-v1router
+v2router
     .post('/apnsToken', asyncWrapper(apnsToken))
     .post('/apnsReceivedNotification', asyncWrapper(apnsReceivedNotification))
     .post('/pubSubTokenRequest', asyncWrapper(pubSubTokenRequest))

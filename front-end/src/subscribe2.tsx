@@ -95,7 +95,7 @@ function DisconnectedView(props: { name: String }) {
     return (
         <>
             <h1>{props.name} has stopped whispering</h1>
-            <p>You can close this window or <a href="/listen/index1.html">click here to reconnect</a>.</p>
+            <p>You can close this window or <a href="/listen/index2.html">click here to reconnect</a>.</p>
         </>
     )
 }

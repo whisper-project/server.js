@@ -67,7 +67,7 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
     }
 }
 
-export async function subscribeToPublisher(req: express.Request, res: express.Response) {
+export async function listenToPublisher(req: express.Request, res: express.Response) {
     function setCookie(name: string, value: string) {
         res.cookie(name, value, { maxAge: 365 * 24 * 60 * 60 * 1000, httpOnly: false })
     }

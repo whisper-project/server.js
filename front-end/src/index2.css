@@ -1,0 +1,28 @@
+body {
+    background-color: white;
+}
+
+#listenerName {
+    box-sizing: border-box;
+    width: 300px;
+    border: solid black 2px;
+    padding: 5px;
+}
+
+#updateButton {
+    padding: 5px;
+}
+
+#liveText {
+    box-sizing: border-box;
+    width: 100%;
+    border: solid black 2px;
+    padding: 5px;
+}
+
+#pastText {
+    box-sizing: border-box;
+    width: 100%;
+    border: solid darkgrey 2px;
+    padding: 5px;
+}

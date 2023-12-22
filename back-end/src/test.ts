@@ -13,6 +13,7 @@ import {ClientData, getClientData, setClientData} from './client.js'
 import {getApnsRequestData, sendSecretToClient} from './apns.js'
 
 import {testAll as test1} from './v1/test.js'
+import {testAll as test2} from './v2/test.js'
 
 export async function createTestClient() {
     const uuid = randomUUID()
@@ -110,6 +111,7 @@ async function testAll(...tests: string[]) {
     loadSettings('test')
     await test0(...tests)
     await test1(...tests)
+    await test2(...tests)
     await deleteTestKeys()
 }
 

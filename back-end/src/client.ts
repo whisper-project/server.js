@@ -10,7 +10,6 @@ export interface ClientData {
     token?: string,
     tokenDate?: number
     lastSecret?: string
-    apnsLastSecret?: string
     secret?: string,
     secretDate?: number,
     pushId?: string,
@@ -58,14 +57,8 @@ export async function hasClientChanged(clientKey: string, received: ClientData) 
         changeReason = "APNS token from new"
     }
     if (!clientChanged && received.lastSecret !== existing?.lastSecret) {
-        // race condition: see issue #2
-        if (existing?.secretDate && existing?.apnsLastSecret && existing.apnsLastSecret === received.lastSecret) {
-            const elapsed = Date.now() - existing.secretDate!
-            console.warn(`Ignoring apns last secret posted ${elapsed} ms after confirmed update.`)
-        } else {
-            clientChanged = true
-            changeReason = "unconfirmed secret from existing"
-        }
+        clientChanged = true
+        changeReason = "unconfirmed secret from existing"
     }
     if (!clientChanged && received.token !== existing?.token) {
         clientChanged = true

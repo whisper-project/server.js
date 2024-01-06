@@ -5,22 +5,24 @@
 import {randomUUID} from 'crypto'
 import assert from 'assert'
 import express from 'express'
+import {fetch} from 'fetch-h2'
 
 import {createApnsJwt, createClientJwt, makeNonce, validateApnsJwt, validateClientJwt} from "./auth.js";
 import {getDb} from './db.js'
 import {loadSettings} from './settings.js'
 import {ClientData, getClientData, setClientData} from './client.js'
-import {getApnsRequestData, sendSecretToClient} from './apns.js'
+import {getApnsRequestData} from './apns.js'
+import {apnsToken} from './routes.js'
+import {asyncWrapper} from './middleware.js'
 
 import {testAll as test1} from './v1/test.js'
 import {testAll as test2} from './v2/test.js'
 
 export async function createTestClient() {
     const uuid = randomUUID()
-    const clientKey = `tcl:${uuid}`
+    const clientKey = `cli:${uuid}`
     const clientData: ClientData = {
         id: uuid,
-        deviceId: Math.random().toString(16).substring(2, 10),
         token: await makeNonce(),
         tokenDate: Date.now() - (2 * 24 * 60 * 60 * 1000),
         secret: await makeNonce(),
@@ -47,23 +49,35 @@ async function testJwt() {
 }
 
 async function testApns() {
-    const server = express().post('/3/device/:tokenId', mockApnsRoute).listen(2197)
+    const server = express()
+        .use(express.json())
+        .post('/apns', asyncWrapper(apnsToken))
+        .post('/3/device/:tokenId', mockApnsRoute)
+        .listen(2197)
     const clientKey = await createTestClient()
     let clientData = await getClientData(clientKey)
     assert(clientData, 'test client has no data')
     clientData.secretDate = 0
     await setClientData(clientKey, clientData)
-    const updated = await sendSecretToClient(clientKey)
+    const body = {
+        clientId: clientData.id,
+        token: clientData.token,
+        lastSecret: clientData.lastSecret,
+        appInfo: 'test-client'
+    }
+    const response1 = await fetch('http://localhost:2197/apns', { method: 'POST', json: body })
+    const response2 = await fetch('http://localhost:2197/apns', { method: 'POST', json: body })
+    assert(response1.status === 204, `Non-204 status from post of APNS token`)
+    assert(response2.status === 204, `Non-204 status from post of APNS token`)
+    assert(response2.headers.get('X-Received-Earlier'), `Second call wasn't caught as a duplicate`)
+    await new Promise(resolve => setTimeout(resolve, 1000))
     clientData = await getClientData(clientKey)
-    assert(clientData && clientData?.pushId, `pushId wasn't recorded on client during update`)
+    assert(clientData && clientData.pushId, `pushId wasn't recorded on client during update`)
     const requestId = `req:${clientData.pushId}`
     const requestData = await getApnsRequestData(requestId)
+    assert(requestData && requestData.id === clientData.pushId && requestData.status == 200)
     server.closeAllConnections()
     server.removeAllListeners()
-    if (!updated) {
-        console.log(`Update failed: ${JSON.stringify(requestData)}`)
-        throw Error(`Update of secret for ${clientKey} failed!`)
-    }
 }
 
 async function mockApnsRoute(req: express.Request, res: express.Response) {
@@ -119,4 +133,8 @@ testAll(...process.argv.slice(2))
     .then(() => {
         console.log("Tests completed with no errors")
         process.exit(0)
+    })
+    .catch(reason => {
+        console.error(`Tests failed: ${reason}`)
+        process.exit(1)
     })

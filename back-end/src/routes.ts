@@ -8,6 +8,8 @@ import {sendSecretToClient} from './apns.js'
 import {ClientData, hasClientChanged, setClientData} from './client.js'
 import {incrementErrorCounts} from './db.js'
 
+const recentlyReceived: ClientData[] = []
+
 export async function apnsToken(req: express.Request, res: express.Response)  {
     const body: { [p: string]: string } = req.body
     if (!body?.token || !body?.clientId || !body?.lastSecret) {
@@ -19,6 +21,7 @@ export async function apnsToken(req: express.Request, res: express.Response)  {
     const clientKey = `cli:${clientId}`
     const tokenHex = Buffer.from(token, 'base64').toString('hex')
     const secretHex = Buffer.from(lastSecret, 'base64').toString('hex')
+    const appInfo = body?.appInfo ? ` (${body.appInfo})` : ''
     const received: ClientData = {
         id: clientId,
         token: tokenHex,
@@ -27,18 +30,31 @@ export async function apnsToken(req: express.Request, res: express.Response)  {
         userName: body?.userName || '',
         appInfo: body?.appInfo || '',
     }
+    // we need to ignore duplicate, almost-simultaneous posts from the same client
+    // see issue #2 for details of the problem
+    for (let i = 0; i < recentlyReceived.length; ) {
+        const recent = recentlyReceived[i]
+        if (recent.tokenDate! + 250 < received.tokenDate!) {
+            recentlyReceived.splice(i, 1)
+        } else if (recent.id === received.id && recent.token === received.token) {
+            console.warn(`Ignoring duplicate APNs post from ${clientKey}${appInfo}`)
+            res.setHeader('X-Received-Earlier', recent.tokenDate!.toString())
+            res.status(204).send()
+            return
+        } else {
+            i += 1
+        }
+    }
+    recentlyReceived.push(received)
     const {clientChanged, changeReason} = await hasClientChanged(clientKey, received)
     await incrementErrorCounts(body)
-    const appInfo = body?.appInfo ? ` (${body.appInfo})` : ''
     if (clientChanged) {
         console.log(`Received ${changeReason} client ${clientKey}${appInfo}`)
-        received.apnsLastSecret = received.lastSecret
         await setClientData(clientKey, received)
     } else {
         console.log(`Received APNS token from unchanged client ${clientKey}${appInfo}`)
     }
-    res.setHeader("Content-Type", "text/plain")
-    res.status(204).send(appInfo)
+    res.status(204).send()
     await sendSecretToClient(clientKey, clientChanged)
 }
 

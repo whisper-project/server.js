@@ -64,10 +64,6 @@ export async function hasClientChanged(clientKey: string, received: ClientData) 
         clientChanged = true
         changeReason = "new APNS token from existing"
     }
-    if (!clientChanged && received.deviceId !== existing?.deviceId) {
-        clientChanged = true
-        changeReason = "new device ID from existing"
-    }
     if (!clientChanged && received.userName !== existing?.userName) {
         clientChanged = true
         changeReason = "new user data from existing"

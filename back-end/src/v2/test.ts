@@ -13,31 +13,33 @@ async function testAbly() {
     const contentId = randomUUID()
     const pubRequest = await createAblyPublishTokenRequest(clientId, conversationId, contentId)
     assert(pubRequest.clientId === clientId, "Publish token's client key is wrong")
-    assert(pubRequest.capability[`${conversationId}:control`].contains('publish'),
+    const pubCaps = JSON.parse(pubRequest.capability)
+    assert(pubCaps[`${conversationId}:control`].includes('publish'),
         "Publish token doesn't authorize control channel publish")
-    assert(pubRequest.capability[`${conversationId}:control`].contains('subscribe'),
+    assert(pubCaps[`${conversationId}:control`].includes('subscribe'),
         "Publish token doesn't authorize control channel subscribe")
-    assert(!pubRequest.capability[`${conversationId}:control`].contains('presence'),
+    assert(!pubCaps[`${conversationId}:control`].includes('presence'),
         "Publish token authorizes control channel presence")
-    assert(pubRequest.capability[`${conversationId}:${contentId}`].contains('publish'),
+    assert(pubCaps[`${conversationId}:${contentId}`].includes('publish'),
         "Publish token doesn't authorize content channel publish")
-    assert(!pubRequest.capability[`${conversationId}:${contentId}`].contains('subscribe'),
+    assert(!pubCaps[`${conversationId}:${contentId}`].includes('subscribe'),
         "Publish token authorizes control content subscribe")
-    assert(!pubRequest.capability[`${conversationId}:${contentId}`].contains('presence'),
+    assert(!pubCaps[`${conversationId}:${contentId}`].includes('presence'),
         "Publish token authorizes control channel presence")
     const subRequest = await createAblySubscribeTokenRequest(clientId, conversationId)
     assert(subRequest.clientId === clientId, "Subscribe token's client key is wrong")
-    assert(subRequest.capability[`${conversationId}:control`].contains('publish'),
+    const subCaps = JSON.parse(subRequest.capability)
+    assert(subCaps[`${conversationId}:control`].includes('publish'),
         "Subscribe token doesn't authorize control channel publish")
-    assert(subRequest.capability[`${conversationId}:control`].contains('subscribe'),
+    assert(subCaps[`${conversationId}:control`].includes('subscribe'),
         "Subscribe token doesn't authorize control channel subscribe")
-    assert(!subRequest.capability[`${conversationId}:control`].contains('presence'),
+    assert(!subCaps[`${conversationId}:control`].includes('presence'),
         "Subscribe token authorizes control channel presence")
-    assert(!subRequest.capability[`${conversationId}:*`].contains('publish'),
+    assert(!subCaps[`${conversationId}:*`].includes('publish'),
         "Subscribe token authorizes content channel publish")
-    assert(subRequest.capability[`${conversationId}:*`].contains('subscribe'),
+    assert(subCaps[`${conversationId}:*`].includes('subscribe'),
         "Subscribe token doesn't authorize control content subscribe")
-    assert(!subRequest.capability[`${conversationId}:*`].contains('presence'),
+    assert(!subCaps[`${conversationId}:*`].includes('presence'),
         "Subscribe token authorizes control channel presence")
 }
 

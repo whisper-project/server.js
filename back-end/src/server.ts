@@ -7,7 +7,7 @@ import express from 'express'
 import {v1router} from './v1/router.js'
 import {v2router} from './v2/router.js'
 import {subscribeToPublisher} from './v1/routes.js';
-import {listenToPublisher} from './v2/routes.js';
+import {listenToConversation} from './v2/routes.js';
 import {asyncWrapper, cookieMiddleware, sessionMiddleware} from './middleware.js'
 
 const PORT = process.env.PORT || 5001;
@@ -19,5 +19,5 @@ express()
     .use('/api/v1', v1router)
     .use('/api', v1router)
     .get('/subscribe/:publisherId', [cookieMiddleware, sessionMiddleware], asyncWrapper(subscribeToPublisher))
-    .get('/listen/:publisherId', [cookieMiddleware, sessionMiddleware], asyncWrapper(listenToPublisher))
+    .get('/listen/:publisherId', [cookieMiddleware, sessionMiddleware], asyncWrapper(listenToConversation))
     .listen(PORT, () => console.log(`Listening on port ${PORT}`))

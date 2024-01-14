@@ -4,11 +4,14 @@
 import {getSettings} from '../settings.js'
 import * as Ably from 'ably/promises.js'
 
-export async function createAblyPublishTokenRequest(clientId: string) {
+export async function createAblyPublishTokenRequest(
+    clientId: string, conversationId: string, contentId: string
+) {
     const config = getSettings()
     const ably = new Ably.Rest({ key: config.ablyPublishKey })
     const tokenCaps = {}
-    tokenCaps[`${clientId}:whisper`] = ['publish', 'subscribe', 'presence']
+    tokenCaps[`${conversationId}:control`] = ['publish', 'subscribe']
+    tokenCaps[`${conversationId}:${contentId}`] = ['publish']
     const tokenParams = {
         clientId,
         capability: JSON.stringify(tokenCaps)
@@ -16,11 +19,12 @@ export async function createAblyPublishTokenRequest(clientId: string) {
     return await ably.auth.createTokenRequest(tokenParams)
 }
 
-export async function createAblySubscribeTokenRequest(clientId: string, publisherId: string) {
+export async function createAblySubscribeTokenRequest(clientId: string, conversationId: string) {
     const config = getSettings()
     const ably = new Ably.Rest({ key: config.ablyPublishKey })
     const tokenCaps = {}
-    tokenCaps[`${publisherId}:whisper`] = ['publish', 'subscribe', 'presence']
+    tokenCaps[`${conversationId}:control`] = ['publish', 'subscribe']
+    tokenCaps[`${conversationId}:*`] = ['subscribe']
     const tokenParams = {
         clientId,
         capability: JSON.stringify(tokenCaps)

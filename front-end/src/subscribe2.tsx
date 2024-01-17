@@ -4,15 +4,16 @@
 
 import React, {useState} from 'react'
 import Cookies from 'js-cookie'
-import {AblyProvider, useChannel, usePresence} from 'ably/react'
+import {AblyProvider, useChannel} from 'ably/react'
 import * as Ably from 'ably'
 
-const publisherId = Cookies.get('publisherId') || ''
-let publisherName = Cookies.get('publisherName') || ''
+const conversationId = Cookies.get('publisherId') || ''
+const conversationName = Cookies.get('conversationName') || ''
+const publisherName = Cookies.get('publisherName') || ''
 const clientId = Cookies.get('clientId') || ''
 let clientName = Cookies.get('clientName') || ''
 
-if (!publisherId || !publisherName || !clientId) {
+if (!conversationId || !publisherName || !clientId || !conversationName) {
     window.location.href = "/subscribe404.html"
 }
 
@@ -22,38 +23,24 @@ const client = new Ably.Realtime.Promise({
     echoMessages: false,
 })
 
-const channelName = `${publisherId}:whisper`
-let hasConnected = false
-let resetInProgress = false
-
 interface Text {
     live: string,
     past: string,
 }
 
-const waitingToConnectText: Text = {
-    live: 'This is where live text will appear',
-    past: 'This is where past text will appear.\nThe newest lines will appear on top.',
-}
-
-const connectedText: Text = {
-    live: '',
-    past: '',
-}
-
 export default function ListenerView() {
-    const [connection, setConnection] = useState("waiting")
+    const [connected, setConnected] = useState(true)
     const [listenerName, setListenerName] = useState(clientName)
-    if (connection == "disconnected") {
-        return <DisconnectedView name={publisherName} />
-    } else if (listenerName) {
+    if (!listenerName) {
+        return <NameView name={listenerName} setName={setListenerName} />
+    } else if (!connected) {
+        return <DisconnectedView />
+    } else {
         return (
             <AblyProvider client={client}>
-                <ConnectionView setConnection={setConnection}/>
+                <ConnectView terminate={() => setConnected(false)} />
             </AblyProvider>
         )
-    } else {
-        return <NameView name={listenerName} setName={setListenerName} />
     }
 }
 
@@ -72,7 +59,15 @@ function NameView(props: { name: String, setName: React.Dispatch<React.SetStateA
 
     return (
         <>
-            <h2>Please provide your name to the whisperer:</h2>
+            <h1>Advisory</h1>
+            <p>
+                By entering your name below, you are agreeing to receive
+                messages sent by another user (the Whisperer) in
+                a remote location.  Your name and agreement will be remembered
+                in this browser for all conversations with all Whisperers
+                until you clear your browser's cookies for this site.
+            </p>
+            <h2>Please provide your name to the Whisperer:</h2>
             <input
                 name="listenerName"
                 id="listenerName"
@@ -85,48 +80,84 @@ function NameView(props: { name: String, setName: React.Dispatch<React.SetStateA
                 type="button"
                 onClick={onUpdate}
             >
-                Update
+                Agree & Save Name
             </button>
         </>
     )
 }
 
-function DisconnectedView(props: { name: String }) {
+function DisconnectedView() {
     return (
         <>
-            <h1>{props.name} has stopped whispering</h1>
-            <p>You can close this window or <a href="/listen/index2.html">click here to reconnect</a>.</p>
+            <h1>The conversation with {publisherName} has ended</h1>
+            <p>
+                You can close this window or
+                <a href={window.location.href}>click here to listen again</a>.
+            </p>
         </>
     )
 }
 
-function ConnectionView(props: { setConnection: React.Dispatch<React.SetStateAction<string>> }) {
-    const [whisperer, updateWhisperer] = useState(`Connecting to ${publisherName}...`)
-    const [text, updateText] = useState(waitingToConnectText)
+function ConnectView(props: { terminate: () => void }) {
+    const [status, setStatus] = useState(`initial`)
     const { channel } = useChannel(
-        channelName,
-        (message) =>
-            receiveChunk(message, channel, props.setConnection, updateWhisperer, updateText))
-    usePresence(channelName, clientName, message => {
-        receivePresence(
-            message as Ably.Types.PresenceMessage, channel, props.setConnection, updateWhisperer, updateText
-        )
-    })
+        `${conversationId}:control`,
+        m => receiveControlChunk(m, setStatus, props.terminate))
+    doCount(() => sendListenOffer(channel), 'initialOffer', 1)
+    const rereadLiveText = () => sendRereadText(channel)
+    if (status.match(/^[A-Za-z-]{36}$/)) {
+        return <ConnectedView contentId={status} reread={rereadLiveText} />
+    } else {
+        return <ConnectingView status={status} />
+    }
+}
+
+function ConnectingView(props: { status: string }) {
+    let message: string
+    switch (props.status) {
+        case 'initial':
+            message = `Starting to connect...`
+            break
+        case 'authenticating':
+            message = `Requesting permission to join the conversation...`
+            break
+        case 'aborted':
+            message = `Conversation terminated at user request`
+            break
+        case 'denied':
+            message = `Listener refused entry into the conversation`
+            break
+        default:
+            message = `Connection complete, starting to listen...`
+    }
     return (
         <>
-            <PublisherName whisperer={whisperer}/>
+            <h1>Conversation “{conversationName}” with {publisherName}</h1>
             <form>
-                <LivePastText text={text}/>
+                <textarea rows={1} id="status" value={message} />
             </form>
         </>
     )
 }
 
-function PublisherName(props: { whisperer: string }) {
-    return <h1>{props.whisperer}</h1>
+function ConnectedView(props: { contentId: string, reread: () => void }) {
+    const [text, updateText] = useState({ live: '', past: '' } as Text)
+    useChannel(
+        `${conversationId}:${props.contentId}`,
+        (m) => receiveContentChunk(m, updateText, props.reread)
+    )
+    return (
+        <>
+            <h1>Conversation “{conversationName}” with {publisherName}</h1>
+            <form>
+                <LivePastText text={text} reread={props.reread}/>
+            </form>
+        </>
+    )
 }
 
-function LivePastText(props: { text: Text }) {
+function LivePastText(props: { text: Text, reread: () => void }) {
+    doCount(props.reread, 'initialRead', 1)
     return (
         <>
             <textarea
@@ -144,95 +175,60 @@ function LivePastText(props: { text: Text }) {
     )
 }
 
-function receiveChunk(message: Ably.Types.Message,
-                      channel: Ably.Types.RealtimeChannelPromise,
-                      setConnection: React.Dispatch<React.SetStateAction<string>>,
-                      updateWhisperer: React.Dispatch<React.SetStateAction<string>>,
-                      updateText: React.Dispatch<React.SetStateAction<Text>>) {
-    maybeConnect("content", channel, setConnection, updateWhisperer, updateText)
-    if (message.name.toUpperCase() === clientId.toUpperCase()) {
-        console.log(`Received chunk directed here: ${message.data}`)
-        const [offset, text] = (message.data as string).split("|", 2)
-        if (offset === "-21" && text.toUpperCase() === clientId.toUpperCase()) {
-            console.log(`Whisperer is dropping this client`)
-            disconnect("content", channel, setConnection, updateWhisperer)
-        } else {
-            processChunk(message.data as string, updateText)
-        }
-    } else if (message.name === 'all') {
-        processChunk(message.data as string, updateText)
-    } else {
-        if (message.clientId.toUpperCase() != publisherId.toUpperCase()) {
-            console.log(`Ignoring chunk from non-listener ${message.clientId}, topic ${message.name}: ${message.data}`)
-        } else {
-            console.log(`Ignoring chunk with topic ${message.name}: ${message.data}`)
-        }
-    }
-}
-
-function receivePresence(message: Ably.Types.PresenceMessage,
-                         channel: Ably.Types.RealtimeChannelPromise,
-                         setConnection: React.Dispatch<React.SetStateAction<string>>,
-                         updateWhisperer: React.Dispatch<React.SetStateAction<string>>,
-                         updateText: React.Dispatch<React.SetStateAction<Text>>) {
-    if (message.clientId.toUpperCase() == clientId.toUpperCase()) {
-        console.log(`Ignoring self presence message: ${message.action}, ${message.data}`)
-    } else if (message.clientId.toUpperCase() === publisherId.toUpperCase()) {
-        console.log(`Received presence from Whisperer: ${message.action}, ${message.data}`)
-        if (['present', 'enter', 'update'].includes(message.action)) {
-            publisherName = message.data
-            maybeConnect("presence", channel, setConnection, updateWhisperer, updateText)
-        } else if (['leave', 'absent'].includes(message.action)) {
-            disconnect('presence', channel, setConnection, updateWhisperer)
-        }
-    } else {
-        console.log(`Ignoring presence message: ${message.clientId}, ${message.data}, ${message.action}`)
-    }
-}
-
-function maybeConnect(messageType: string,
-                      channel: Ably.Types.RealtimeChannelPromise,
-                      setConnection: React.Dispatch<React.SetStateAction<string>>,
-                      updateWhisperer: React.Dispatch<React.SetStateAction<string>>,
-                      updateText: React.Dispatch<React.SetStateAction<Text>>) {
-    if (!hasConnected) {
-        hasConnected = true
-        console.log(`Connecting due to first message of type ${messageType}`)
-        setConnection("connected")
-        updateWhisperer(`Connected to ${publisherName}`)
-        updateText(connectedText)
-        readLiveText(channel)
-    }
-}
-
-function disconnect(messageType: string,
-                    channel: Ably.Types.RealtimeChannelPromise,
-                    setConnection: React.Dispatch<React.SetStateAction<string>>,
-                    updateWhisperer: React.Dispatch<React.SetStateAction<string>>) {
-    console.log(`Disconnecting due to message of type: ${messageType}`)
-    setConnection("disconnected")
-    updateWhisperer(`Disconnected from ${publisherName}`)
-    channel.detach().then()
-}
-
-function readLiveText(channel: Ably.Types.RealtimeChannelPromise) {
-    if (resetInProgress) {
-        // already reading all the text
+function receiveControlChunk(message: Ably.Types.Message,
+                             setStatus: React.Dispatch<React.SetStateAction<string>>,
+                             terminate: () => void) {
+    const me = clientId.toUpperCase()
+    const topic = message.name.toUpperCase()
+    if (topic != me && topic != "ALL") {
+        // ignoring message for another client
         return
     }
-    console.log("Requesting resend of live text...")
-    resetInProgress = true
-    // request the whisperer to send all the text
-    channel.publish(publisherId, "-20|live").then()
+    const info = parseControlChunk(message.data)
+    if (!info) {
+        console.error(`Ignoring invalid control packet: ${message.data}`)
+        setStatus(`Ignoring an invalid packet; see log for details`)
+        return
+    }
+    switch (info.offset) {
+        case 'dropping':
+            console.log(`Whisperer is dropping this client`)
+            terminate()
+            break
+        case 'listenAuthYes':
+            console.log(`Received content id: ${info.contentId}`)
+            if (info.contentId.match(/^[A-Za-z-]{36}$/)) {
+                setStatus(info.contentId)
+            } else {
+                console.error(`Invalid content id: ${info.contentId}`)
+                alert("Communication error: invalid channel id!")
+                terminate()
+            }
+            break
+        case 'listenAuthNo':
+            console.log(`Whisperer refused listener presence`)
+            setStatus('denied')
+            setTimeout(terminate, 1000)
+            break
+        case 'whisperOffer':
+            console.log(`Received Whisper offer, sending request`)
+    }
 }
 
-function processChunk(chunk: string,
-                      updateText: React.Dispatch<React.SetStateAction<Text>>) {
-    function isDiff(chunk: string): boolean {
-        return chunk.startsWith('-1') || !chunk.startsWith('-')
+let resetInProgress = false
+
+function receiveContentChunk(message: Ably.Types.Message,
+                             updateText: React.Dispatch<React.SetStateAction<Text>>,
+                             reread: () => void) {
+    const me = clientId.toUpperCase()
+    const topic = message.name.toUpperCase()
+    const chunk = message.data as string
+    if (topic != me && topic != "ALL") {
+        // ignoring message for another client
+        return
     }
     if (chunk.startsWith('-9|')) {
-        console.log("Received request to play sound")
+        console.warn(`Received request to play ${chunk.substring(3)} sound, but can't do that`)
     } else if (resetInProgress) {
         if (chunk.startsWith('-4|')) {
             console.log("Received reset acknowledgement from whisperer, resetting live text")
@@ -265,9 +261,86 @@ function processChunk(chunk: string,
         } else {
             const [offsetDigits, suffix] = chunk.split('|', 2)
             const offset = parseInt(offsetDigits)
-            updateText((text: Text) => {
-                return { live: text.live.substring(0, offset) + suffix, past: text.past }
+            updateText((text: Text): Text => {
+                if (!offset || offset > text.live.length) {
+                    reread()
+                    return text
+                } else {
+                    return { live: text.live.substring(0, offset) + suffix, past: text.past }
+                }
             })
         }
+    }
+}
+
+interface ClientInfo {
+    offset: string,
+    conversationId: string,
+    conversationName: string,
+    clientId: string,
+    profileId: string,
+    username: string,
+    contentId: string,
+}
+
+function parseOffset(offset: string): string | undefined {
+    switch (parseInt(offset)) {
+        case -20: return "whisperOffer";
+        case -21: return "listenRequest";
+        case -22: return "listenAuthYes";
+        case -23: return "listenAuthNo";
+        case -24: return "joining";
+        case -25: return "dropping";
+        case -26: return "listenOffer";
+        default: return undefined
+    }
+}
+
+function parseControlChunk(chunk: String) {
+    const parts = chunk.split('|')
+    const offset = parseOffset(parts[0])
+    if (parts.length != 7 || !offset) {
+        return undefined
+    }
+    const info: ClientInfo = {
+        offset,
+        conversationId: parts[1],
+        conversationName: parts[2],
+        clientId: parts[3],
+        profileId: parts[4],
+        username: parts[5],
+        contentId: parts[6],
+    }
+    return info
+}
+
+function isDiff(chunk: string): boolean {
+    return chunk.startsWith('-1') || !chunk.startsWith('-')
+}
+
+function sendListenOffer(channel: Ably.Types.RealtimeChannelPromise) {
+    console.log(`Sending listen offer`)
+    let chunk = `-26|${conversationId}||${clientId}|${clientId}||`
+    channel.publish("listener", chunk).then()
+}
+
+function sendRereadText(channel: Ably.Types.RealtimeChannelPromise) {
+    if (resetInProgress) {
+        // already re-reading all the text
+        return
+    }
+    console.log("Requesting resend of live text...")
+    resetInProgress = true
+    // request the whisperer to send all the text
+    channel.publish(conversationId, "-20|live").then()
+}
+
+const doneCounts: {[p: string]: number} = { }
+
+function doCount(fn: (() => void), which: string, max: number) {
+    const doneCount = doneCounts[which] || 0
+    if (doneCount < max) {
+        doneCounts[which] = doneCount + 1
+        fn()
     }
 }

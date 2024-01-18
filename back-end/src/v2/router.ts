@@ -4,7 +4,7 @@
 
 import express from 'express'
 
-import {pubSubTokenRequest, subscribeTokenRequest,} from './routes.js';
+import {pubSubTokenRequest, listenTokenRequest,} from './routes.js';
 import {asyncWrapper, sessionMiddleware} from '../middleware.js'
 import {apnsReceivedNotification, apnsToken} from '../routes.js'
 
@@ -14,4 +14,4 @@ v2router
     .post('/apnsToken', asyncWrapper(apnsToken))
     .post('/apnsReceivedNotification', asyncWrapper(apnsReceivedNotification))
     .post('/pubSubTokenRequest', asyncWrapper(pubSubTokenRequest))
-    .get('/subscribeTokenRequest', [sessionMiddleware], asyncWrapper(subscribeTokenRequest))
+    .get('/subscribeTokenRequest', [sessionMiddleware], asyncWrapper(listenTokenRequest))

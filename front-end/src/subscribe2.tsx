@@ -19,7 +19,7 @@ if (!conversationId || !whispererName || !clientId || !conversationName) {
 
 const client = new Ably.Realtime.Promise({
     clientId: clientId,
-    authUrl: '/api/subscribeTokenRequest',
+    authUrl: '/api/v2/listenTokenRequest',
     echoMessages: false,
 })
 

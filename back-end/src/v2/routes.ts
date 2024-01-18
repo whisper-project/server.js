@@ -90,13 +90,15 @@ export async function listenToConversation(req: express.Request, res: express.Re
     res.status(200).send(body)
 }
 
-export async function subscribeTokenRequest(req: express.Request, res: express.Response) {
+export async function listenTokenRequest(req: express.Request, res: express.Response) {
     const clientId = req?.session?.clientId
     const conversationId = req?.session?.conversationId
     if (!clientId || !conversationId) {
+        console.error("Refusing listen token request outside of session")
         res.status(403).send({ status: 'error', reason: 'no session to support authentication' })
         return
     }
+    console.log(`Listen token request from web client ${clientId} to conversation ${conversationId}`)
     const tokenRequest = await createAblySubscribeTokenRequest(clientId, conversationId)
     res.status(200).send(tokenRequest)
 }

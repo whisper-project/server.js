@@ -18,8 +18,8 @@ async function testAbly() {
         "Publish token doesn't authorize control channel publish")
     assert(pubCaps[`${conversationId}:control`].includes('subscribe'),
         "Publish token doesn't authorize control channel subscribe")
-    assert(!pubCaps[`${conversationId}:control`].includes('presence'),
-        "Publish token authorizes control channel presence")
+    assert(pubCaps[`${conversationId}:control`].includes('presence'),
+        "Publish token doesn't authorize control channel presence")
     assert(pubCaps[`${conversationId}:${contentId}`].includes('publish'),
         "Publish token doesn't authorize content channel publish")
     assert(!pubCaps[`${conversationId}:${contentId}`].includes('subscribe'),
@@ -38,9 +38,9 @@ async function testAbly() {
     assert(!subCaps[`${conversationId}:*`].includes('publish'),
         "Subscribe token authorizes content channel publish")
     assert(subCaps[`${conversationId}:*`].includes('subscribe'),
-        "Subscribe token doesn't authorize control content subscribe")
+        "Subscribe token doesn't authorize content channel subscribe")
     assert(!subCaps[`${conversationId}:*`].includes('presence'),
-        "Subscribe token authorizes control channel presence")
+        "Subscribe token authorizes content channel presence")
 }
 
 export async function testAll(...tests: string[]) {

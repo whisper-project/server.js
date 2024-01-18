@@ -43,6 +43,7 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
         const info: ConversationInfo = {
             id: conversationId, name: body.conversationName, ownerId: body.profileId, ownerName: body.username
         }
+        console.log(`Saving conversation data for listeners: ${JSON.stringify(info)}`)
         await setConversationInfo(conversationKey, info)
         // now issue the token
         const tokenRequest = await createAblyPublishTokenRequest(clientId, conversationId, contentId)
@@ -61,12 +62,15 @@ export async function listenToConversation(req: express.Request, res: express.Re
     }
     const conversationId = req.params?.conversationId
     if (!conversationId || !conversationId.match(/^[-0-9a-zA-Z]{36}$/)) {
+        console.error(`Received listen link for invalid conversation id ${conversationId}`)
         res.setHeader('Location', '/subscribe404.html')
         res.status(303).send()
         return
     }
+    console.log(`Received listen link for conversation id ${conversationId}`)
     const conversationKey = `con:${conversationId}`
     const info = await getConversationInfo(conversationKey)
+    console.log(`Fetched conversation info for listener: ${JSON.stringify(info)}`)
     if (!info) {
         res.setHeader('Location', '/subscribe404.html')
         res.status(303).send()

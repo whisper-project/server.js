@@ -200,9 +200,13 @@ function receiveControlChunk(message: Ably.Types.Message,
         case 'listenAuthYes':
             console.log(`Received content id: ${info.contentId}`)
             if (info.contentId.match(/^[A-Za-z0-9-]{36}$/)) {
+                console.log(`Joining the conversation`)
+                const offset = offsetValue('joining')
+                const chunk = `${offset}|${conversationId}|${info.conversationName}|${clientId}|${clientId}|${clientName}|`
+                channel.publish(info.clientId, chunk)
                 setStatus(info.contentId)
             } else {
-                console.error(`Invalid content id: ${info.contentId}`)
+                console.error(`Invalid content id: ${info.contentId}.  Please report a bug!`)
                 alert("Communication error: invalid channel id!")
                 terminate()
             }

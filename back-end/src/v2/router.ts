@@ -14,4 +14,4 @@ v2router
     .post('/apnsToken', asyncWrapper(apnsToken))
     .post('/apnsReceivedNotification', asyncWrapper(apnsReceivedNotification))
     .post('/pubSubTokenRequest', asyncWrapper(pubSubTokenRequest))
-    .get('/subscribeTokenRequest', [sessionMiddleware], asyncWrapper(listenTokenRequest))
+    .get('/listenTokenRequest', [sessionMiddleware], asyncWrapper(listenTokenRequest))

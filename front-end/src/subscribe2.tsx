@@ -87,6 +87,7 @@ function NameView(props: { name: String, setName: React.Dispatch<React.SetStateA
 }
 
 function DisconnectedView() {
+    client.close()
     return (
         <>
             <h1>The conversation with {whispererName} has ended</h1>

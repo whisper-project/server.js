@@ -87,13 +87,13 @@ function NameView(props: { name: String, setName: React.Dispatch<React.SetStateA
 }
 
 function DisconnectedView() {
+    console.log("Closing all connections")
     client.close()
     return (
         <>
             <h1>The conversation with {whispererName} has ended</h1>
             <p>
-                You can close this window or
-                <a href={window.location.href}>click here to listen again</a>.
+                You can close this window or <a href={window.location.href}>click here to listen again</a>.
             </p>
         </>
     )
@@ -106,7 +106,7 @@ function ConnectView(props: { terminate: () => void }) {
         m => receiveControlChunk(m, channel, setStatus, props.terminate))
     doCount(() => sendListenOffer(channel), 'initialOffer', 1)
     const rereadLiveText = () => sendRereadText(channel)
-    if (status.match(/^[A-Za-z-]{36}$/)) {
+    if (status.match(/^[A-Za-z0-9-]{36}$/)) {
         return <ConnectedView contentId={status} reread={rereadLiveText} />
     } else {
         return <ConnectingView status={status} />
@@ -199,7 +199,7 @@ function receiveControlChunk(message: Ably.Types.Message,
             break
         case 'listenAuthYes':
             console.log(`Received content id: ${info.contentId}`)
-            if (info.contentId.match(/^[A-Za-z-]{36}$/)) {
+            if (info.contentId.match(/^[A-Za-z0-9-]{36}$/)) {
                 setStatus(info.contentId)
             } else {
                 console.error(`Invalid content id: ${info.contentId}`)

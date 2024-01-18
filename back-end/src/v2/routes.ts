@@ -7,12 +7,13 @@ import {randomUUID} from 'crypto'
 
 import {createAblyPublishTokenRequest, createAblySubscribeTokenRequest} from './auth.js'
 import {subscribe_response} from './templates.js'
-import {getClientData} from '../client.js'
 import {validateClientJwt} from '../auth.js'
+import {ConversationInfo, getConversationInfo, setConversationInfo} from '../conversation.js'
 
 export async function pubSubTokenRequest(req: express.Request, res: express.Response) {
     const body: { [p: string]: string } = req.body
-    if (!body?.clientId || !body?.activity || !body?.conversationId || !body?.contentId) {
+    if (!body?.clientId || !body?.activity || !body?.conversationId || !body?.conversationName ||
+        !body?.contentId || !body.profileId || !body.username) {
         console.log(`Missing key in pub-sub token request body: ${JSON.stringify(body)}`)
         res.status(400).send({ status: 'error', reason: 'Invalid post data' });
         return
@@ -37,6 +38,13 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
         return
     }
     if (activity === 'publish') {
+        // save the conversation info for Web listeners:
+        const conversationKey = `con:${body.conversationId}`
+        const info: ConversationInfo = {
+            id: conversationId, name: body.conversationName, ownerId: body.profileId, ownerName: body.username
+        }
+        await setConversationInfo(conversationKey, info)
+        // now issue the token
         const tokenRequest = await createAblyPublishTokenRequest(clientId, conversationId, contentId)
         console.log(`Issued publish token request to client ${clientKey}`)
         res.status(200).send({ status: 'success', tokenRequest: JSON.stringify(tokenRequest)})
@@ -52,29 +60,29 @@ export async function listenToConversation(req: express.Request, res: express.Re
         res.cookie(name, value, { maxAge: 365 * 24 * 60 * 60 * 1000, httpOnly: false })
     }
     const conversationId = req.params?.conversationId
-    if (!conversationId || conversationId.match(/^[-0-9a-zA-Z]{36}$/) === null) {
+    if (!conversationId || !conversationId.match(/^[-0-9a-zA-Z]{36}$/)) {
         res.setHeader('Location', '/subscribe404.html')
         res.status(303).send()
         return
     }
-    const publisherKey = `cli:${conversationId}`
-    const existing = await getClientData(publisherKey)
-    if (!existing) {
+    const conversationKey = `con:${conversationId}`
+    const info = await getConversationInfo(conversationKey)
+    if (!info) {
         res.setHeader('Location', '/subscribe404.html')
         res.status(303).send()
         return
     }
-    const publisherName = existing?.userName || 'Unknown Whisperer'
     let clientId = req?.session?.clientId
     if (!clientId) {
         clientId = randomUUID().toUpperCase()
     }
     req.session = { clientId, conversationId }
     setCookie('conversationId', conversationId)
-    setCookie('publisherName', publisherName)
+    setCookie('conversationName', info.name)
+    setCookie('whispererName', info.ownerName)
     setCookie('clientId', clientId)
     setCookie('clientName', req.cookies?.clientName || '')
-    const body = subscribe_response(publisherName)
+    const body = subscribe_response(info.name, info.ownerName)
     res.status(200).send(body)
 }
 

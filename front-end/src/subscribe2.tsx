@@ -7,13 +7,13 @@ import Cookies from 'js-cookie'
 import {AblyProvider, useChannel} from 'ably/react'
 import * as Ably from 'ably'
 
-const conversationId = Cookies.get('publisherId') || ''
+const conversationId = Cookies.get('conversationId') || ''
 const conversationName = Cookies.get('conversationName') || ''
-const publisherName = Cookies.get('publisherName') || ''
+const whispererName = Cookies.get('whispererName') || ''
 const clientId = Cookies.get('clientId') || ''
 let clientName = Cookies.get('clientName') || ''
 
-if (!conversationId || !publisherName || !clientId || !conversationName) {
+if (!conversationId || !whispererName || !clientId || !conversationName) {
     window.location.href = "/subscribe404.html"
 }
 
@@ -89,7 +89,7 @@ function NameView(props: { name: String, setName: React.Dispatch<React.SetStateA
 function DisconnectedView() {
     return (
         <>
-            <h1>The conversation with {publisherName} has ended</h1>
+            <h1>The conversation with {whispererName} has ended</h1>
             <p>
                 You can close this window or
                 <a href={window.location.href}>click here to listen again</a>.
@@ -132,7 +132,7 @@ function ConnectingView(props: { status: string }) {
     }
     return (
         <>
-            <h1>Conversation “{conversationName}” with {publisherName}</h1>
+            <h1>Conversation “{conversationName}” with {whispererName}</h1>
             <form>
                 <textarea rows={1} id="status" value={message} />
             </form>
@@ -148,7 +148,7 @@ function ConnectedView(props: { contentId: string, reread: () => void }) {
     )
     return (
         <>
-            <h1>Conversation “{conversationName}” with {publisherName}</h1>
+            <h1>Conversation “{conversationName}” with {whispererName}</h1>
             <form>
                 <LivePastText text={text} reread={props.reread}/>
             </form>

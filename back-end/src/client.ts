@@ -24,7 +24,7 @@ export async function getClientData(clientKey: string) {
     if (!existing?.id) {
         return undefined
     }
-    if (existing?.tokenDate === "string") {
+    if (typeof existing?.tokenDate === "string") {
         existing.tokenDate = parseInt(existing.tokenDate)
     }
     if (typeof existing?.secretDate === "string") {

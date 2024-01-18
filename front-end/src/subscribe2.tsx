@@ -102,7 +102,7 @@ function ConnectView(props: { terminate: () => void }) {
     const [status, setStatus] = useState(`initial`)
     const { channel } = useChannel(
         `${conversationId}:control`,
-        m => receiveControlChunk(m, setStatus, props.terminate))
+        m => receiveControlChunk(m, channel, setStatus, props.terminate))
     doCount(() => sendListenOffer(channel), 'initialOffer', 1)
     const rereadLiveText = () => sendRereadText(channel)
     if (status.match(/^[A-Za-z-]{36}$/)) {
@@ -118,14 +118,14 @@ function ConnectingView(props: { status: string }) {
         case 'initial':
             message = `Starting to connect...`
             break
-        case 'authenticating':
+        case 'requesting':
             message = `Requesting permission to join the conversation...`
             break
         case 'aborted':
             message = `Conversation terminated at user request`
             break
         case 'denied':
-            message = `Listener refused entry into the conversation`
+            message = `Whisperer refused entry into the conversation`
             break
         default:
             message = `Connection complete, starting to listen...`
@@ -176,6 +176,7 @@ function LivePastText(props: { text: Text, reread: () => void }) {
 }
 
 function receiveControlChunk(message: Ably.Types.Message,
+                             channel: Ably.Types.RealtimeChannelPromise,
                              setStatus: React.Dispatch<React.SetStateAction<string>>,
                              terminate: () => void) {
     const me = clientId.toUpperCase()
@@ -212,6 +213,11 @@ function receiveControlChunk(message: Ably.Types.Message,
             break
         case 'whisperOffer':
             console.log(`Received Whisper offer, sending request`)
+            setStatus('requesting')
+            console.log(`Received whisper offer from ${info.clientId}, sending listen request`)
+            const offset = offsetValue('listenRequest')
+            const chunk = `${offset}|${conversationId}|${info.conversationName}|${clientId}|${clientId}|${clientName}|`
+            channel.publish(info.clientId, chunk)
     }
 }
 
@@ -227,7 +233,7 @@ function receiveContentChunk(message: Ably.Types.Message,
         // ignoring message for another client
         return
     }
-    if (chunk.startsWith('-9|')) {
+    if (chunk.startsWith('-7|')) {
         console.warn(`Received request to play ${chunk.substring(3)} sound, but can't do that`)
     } else if (resetInProgress) {
         if (chunk.startsWith('-4|')) {
@@ -284,14 +290,29 @@ interface ClientInfo {
 }
 
 function parseOffset(offset: string): string | undefined {
-    switch (parseInt(offset)) {
-        case -20: return "whisperOffer";
-        case -21: return "listenRequest";
-        case -22: return "listenAuthYes";
-        case -23: return "listenAuthNo";
-        case -24: return "joining";
-        case -25: return "dropping";
-        case -26: return "listenOffer";
+    switch (offset) {
+        case '-20': return 'whisperOffer';
+        case '-21': return 'listenRequest';
+        case '-22': return 'listenAuthYes';
+        case '-23': return 'listenAuthNo';
+        case '-24': return 'joining';
+        case '-25': return 'dropping';
+        case '-26': return 'listenOffer';
+        case '-40': return 'requestReread'
+        default: return undefined
+    }
+}
+
+function offsetValue(offset: string): string | undefined {
+    switch (offset) {
+        case 'whisperOffer': return '-20'
+        case 'listenRequest': return '-21'
+        case 'listenAuthYes': return '-22'
+        case 'listenAuthNo': return '-23'
+        case 'joining': return '-24'
+        case 'dropping': return '-25'
+        case 'listenOffer': return '-26'
+        case 'requestReread': return '-40'
         default: return undefined
     }
 }
@@ -320,8 +341,8 @@ function isDiff(chunk: string): boolean {
 
 function sendListenOffer(channel: Ably.Types.RealtimeChannelPromise) {
     console.log(`Sending listen offer`)
-    let chunk = `-26|${conversationId}||${clientId}|${clientId}||`
-    channel.publish("listener", chunk).then()
+    let chunk = `${offsetValue('listenOffer')}|${conversationId}||${clientId}|${clientId}||`
+    channel.publish("whisperer", chunk).then()
 }
 
 function sendRereadText(channel: Ably.Types.RealtimeChannelPromise) {
@@ -332,7 +353,8 @@ function sendRereadText(channel: Ably.Types.RealtimeChannelPromise) {
     console.log("Requesting resend of live text...")
     resetInProgress = true
     // request the whisperer to send all the text
-    channel.publish(conversationId, "-20|live").then()
+    let chunk = `${offsetValue('requestReread')}|live`
+    channel.publish("whisperer", chunk).then()
 }
 
 const doneCounts: {[p: string]: number} = { }

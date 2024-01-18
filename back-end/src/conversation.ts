@@ -14,7 +14,7 @@ export interface ConversationInfo {
 export async function getConversationInfo(conversationKey: string) {
     const rc = await getDb()
     const existing = await rc.hGetAll(dbKeyPrefix + conversationKey)
-    if (!existing?.id || !existing.name || !existing?.ownerId || !existing?.username) {
+    if (!existing?.id || !existing.name || !existing?.ownerId || !existing?.ownerName) {
         return undefined
     }
     return existing as unknown as ConversationInfo

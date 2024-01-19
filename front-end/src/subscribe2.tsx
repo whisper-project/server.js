@@ -201,9 +201,9 @@ function receiveControlChunk(message: Ably.Types.Message,
             console.log(`Received content id: ${info.contentId}`)
             if (info.contentId.match(/^[A-Za-z0-9-]{36}$/)) {
                 console.log(`Joining the conversation`)
-                const offset = offsetValue('joining')
+                const offset = controlOffsetValue('joining')
                 const chunk = `${offset}|${conversationId}|${info.conversationName}|${clientId}|${clientId}|${clientName}|`
-                channel.publish(info.clientId, chunk)
+                channel.publish(info.clientId, chunk).then()
                 setStatus(info.contentId)
             } else {
                 console.error(`Invalid content id: ${info.contentId}.  Please report a bug!`)
@@ -220,9 +220,9 @@ function receiveControlChunk(message: Ably.Types.Message,
             console.log(`Received Whisper offer, sending request`)
             setStatus('requesting')
             console.log(`Received whisper offer from ${info.clientId}, sending listen request`)
-            const offset = offsetValue('listenRequest')
+            const offset = controlOffsetValue('listenRequest')
             const chunk = `${offset}|${conversationId}|${info.conversationName}|${clientId}|${clientId}|${clientName}|`
-            channel.publish(info.clientId, chunk)
+            channel.publish(info.clientId, chunk).then()
     }
 }
 
@@ -233,53 +233,58 @@ function receiveContentChunk(message: Ably.Types.Message,
                              reread: () => void) {
     const me = clientId.toUpperCase()
     const topic = message.name.toUpperCase()
-    const chunk = message.data as string
     if (topic != me && topic != "ALL") {
         // ignoring message for another client
         return
     }
-    if (chunk.startsWith('-7|')) {
-        console.warn(`Received request to play ${chunk.substring(3)} sound, but can't do that`)
-    } else if (resetInProgress) {
-        if (chunk.startsWith('-4|')) {
+    const chunk = parseContentChunk(message.data as string)
+    if (!chunk) {
+        console.error(`Ignoring invalid content chunk: ${message.data as string}`)
+        return
+    }
+    if (resetInProgress) {
+        if (chunk.offset === 'startReread') {
             console.log("Received reset acknowledgement from whisperer, resetting live text")
             updateText((text: Text) => {
                 return { live: '', past: text.past }
             })
-        } else if (isDiff(chunk)) {
+        } else if (chunk.isDiff) {
             console.log("Ignoring diff chunk because a read is in progress")
-        } else if (chunk.startsWith('-1|') || chunk.startsWith('-2|')) {
+        } else if (chunk.offset === 'pastText') {
             console.log("Received unexpected past line chunk, ignoring it")
-        } else if (chunk.startsWith('-3|')) {
+        } else if (chunk.offset === 'liveText') {
             console.log("Receive live text chunk, update is over")
-            updateText((text: Text) => {
-                return { live: chunk.substring(3), past: text.past }
-            })
             resetInProgress = false
-        }
-    } else {
-        if (!isDiff(chunk)) {
-            console.log("Ignoring non-diff chunk because no read in progress")
-        } else if (chunk.startsWith('0|')) {
             updateText((text: Text) => {
-                return { live: chunk.substring(2), past: text.past }
+                return { live: chunk.text, past: text.past }
             })
-        } else if (chunk.startsWith('-1|')) {
+        }
+    } else if (chunk.isDiff) {
+        if (chunk.offset === 0) {
+            updateText((text: Text) => {
+                return { live: chunk.text, past: text.past }
+            })
+        } else if (chunk.offset === 'newline') {
             console.log("Prepending live text to past line")
             updateText((text: Text) => {
                 return { live: '', past: text.live + '\n' + text.past }
             })
         } else {
-            const [offsetDigits, suffix] = chunk.split('|', 2)
-            const offset = parseInt(offsetDigits)
+            const offset = chunk.offset as number
             updateText((text: Text): Text => {
-                if (!offset || offset > text.live.length) {
+                if (offset > text.live.length) {
                     reread()
                     return text
                 } else {
-                    return { live: text.live.substring(0, offset) + suffix, past: text.past }
+                    return { live: text.live.substring(0, offset) + chunk.text, past: text.past }
                 }
             })
+        }
+    } else {
+        if (typeof chunk.offset === 'string') {
+            console.warn(`Ignoring ${chunk.offset} content request for: ${chunk.text}`)
+        } else {
+            console.error(`Unimplemented content chunk with offset ${chunk.offset} text: ${chunk.text}`)
         }
     }
 }
@@ -294,7 +299,7 @@ interface ClientInfo {
     contentId: string,
 }
 
-function parseOffset(offset: string): string | undefined {
+function parseControlOffset(offset: string): string | undefined {
     switch (offset) {
         case '-20': return 'whisperOffer';
         case '-21': return 'listenRequest';
@@ -308,7 +313,7 @@ function parseOffset(offset: string): string | undefined {
     }
 }
 
-function offsetValue(offset: string): string | undefined {
+function controlOffsetValue(offset: string): string | undefined {
     switch (offset) {
         case 'whisperOffer': return '-20'
         case 'listenRequest': return '-21'
@@ -324,7 +329,7 @@ function offsetValue(offset: string): string | undefined {
 
 function parseControlChunk(chunk: String) {
     const parts = chunk.split('|')
-    const offset = parseOffset(parts[0])
+    const offset = parseControlOffset(parts[0])
     if (parts.length != 7 || !offset) {
         return undefined
     }
@@ -340,13 +345,45 @@ function parseControlChunk(chunk: String) {
     return info
 }
 
-function isDiff(chunk: string): boolean {
-    return chunk.startsWith('-1') || !chunk.startsWith('-')
+interface ContentChunk {
+    isDiff: boolean
+    offset: string | number
+    text: string
+}
+
+function parseContentChunk(chunk: String) {
+    const parts = chunk.match(/^(-?[0-9]+)|(.*)$/)
+    if (!parts || parts.length != 3) {
+        return undefined
+    }
+    const offsetNum = parseInt(parts[1])
+    if (!offsetNum) {
+        return undefined
+    }
+    const parsed: ContentChunk = {
+        isDiff: offsetNum >= -1,
+        offset: parseContentOffset(offsetNum) || offsetNum,
+        text: parts[2]
+    }
+    return parsed
+}
+
+function parseContentOffset(offset: number) {
+    switch (offset) {
+        case -1: return 'newline'
+        case -2: return 'pastText'
+        case -3: return 'liveText'
+        case -4: return 'startReread'
+        case -6: return 'clearHistory'
+        case -7: return 'playSound'
+        case -8: return 'playSpeech'
+        default: return undefined
+    }
 }
 
 function sendListenOffer(channel: Ably.Types.RealtimeChannelPromise) {
     console.log(`Sending listen offer`)
-    let chunk = `${offsetValue('listenOffer')}|${conversationId}||${clientId}|${clientId}||`
+    let chunk = `${controlOffsetValue('listenOffer')}|${conversationId}||${clientId}|${clientId}||`
     channel.publish("whisperer", chunk).then()
 }
 
@@ -358,7 +395,7 @@ function sendRereadText(channel: Ably.Types.RealtimeChannelPromise) {
     console.log("Requesting resend of live text...")
     resetInProgress = true
     // request the whisperer to send all the text
-    let chunk = `${offsetValue('requestReread')}|live`
+    let chunk = `${controlOffsetValue('requestReread')}|live`
     channel.publish("whisperer", chunk).then()
 }
 

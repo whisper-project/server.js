@@ -2,7 +2,7 @@
 // Licensed under the GNU Affero General Public License v3.
 // See the LICENSE file for details.
 
-import React, {useState} from 'react'
+import React, {useEffect, useState} from 'react'
 import Cookies from 'js-cookie'
 import {AblyProvider, useChannel} from 'ably/react'
 import * as Ably from 'ably'
@@ -29,16 +29,16 @@ interface Text {
 }
 
 export default function ListenerView() {
-    const [connected, setConnected] = useState(true)
+    const [exitMsg, setExitMsg] = useState('')
     const [listenerName, setListenerName] = useState(clientName)
     if (!listenerName) {
         return <NameView name={listenerName} setName={setListenerName} />
-    } else if (!connected) {
-        return <DisconnectedView />
+    } else if (exitMsg) {
+        return <DisconnectedView message={exitMsg}/>
     } else {
         return (
             <AblyProvider client={client}>
-                <ConnectView terminate={() => setConnected(false)} />
+                <ConnectView exit={(msg) => setExitMsg(msg)} />
             </AblyProvider>
         )
     }
@@ -86,12 +86,13 @@ function NameView(props: { name: String, setName: React.Dispatch<React.SetStateA
     )
 }
 
-function DisconnectedView() {
+function DisconnectedView(props: { message: string }) {
     console.log("Closing all connections")
     client.close()
     return (
         <>
-            <h1>The conversation with {whispererName} has ended</h1>
+            <h1>Disconnected from conversation “{conversationName}”</h1>
+            <p>{props.message}</p>
             <p>
                 You can close this window or <a href={window.location.href}>click here to listen again</a>.
             </p>
@@ -99,11 +100,12 @@ function DisconnectedView() {
     )
 }
 
-function ConnectView(props: { terminate: () => void }) {
+function ConnectView(props: { exit: (msg: string) => void }) {
     const [status, setStatus] = useState(`initial`)
     const { channel } = useChannel(
         `${conversationId}:control`,
-        m => receiveControlChunk(m, channel, setStatus, props.terminate))
+        m => receiveControlChunk(m, channel, setStatus, props.exit))
+    hookUnload(() => sendDrop(channel) )
     doCount(() => sendListenOffer(channel), 'initialOffer', 1)
     const rereadLiveText = () => sendRereadText(channel)
     if (status.match(/^[A-Za-z0-9-]{36}$/)) {
@@ -122,14 +124,8 @@ function ConnectingView(props: { status: string }) {
         case 'requesting':
             message = `Requesting permission to join the conversation...`
             break
-        case 'aborted':
-            message = `Conversation terminated at user request`
-            break
-        case 'denied':
-            message = `Whisperer refused entry into the conversation`
-            break
         default:
-            message = `Connection complete, starting to listen...`
+            message = `Something has gone wrong (invalid status ${props.status}).  Please try refreshing this window.`
     }
     return (
         <>
@@ -179,7 +175,7 @@ function LivePastText(props: { text: Text, reread: () => void }) {
 function receiveControlChunk(message: Ably.Types.Message,
                              channel: Ably.Types.RealtimeChannelPromise,
                              setStatus: React.Dispatch<React.SetStateAction<string>>,
-                             terminate: () => void) {
+                             exit: (msg: string) => void) {
     const me = clientId.toUpperCase()
     const topic = message.name.toUpperCase()
     if (topic != me && topic != "ALL") {
@@ -195,7 +191,7 @@ function receiveControlChunk(message: Ably.Types.Message,
     switch (info.offset) {
         case 'dropping':
             console.log(`Whisperer is dropping this client`)
-            terminate()
+            exit(`${whispererName} has stopped whispering.`)
             break
         case 'listenAuthYes':
             console.log(`Received content id: ${info.contentId}`)
@@ -207,14 +203,14 @@ function receiveControlChunk(message: Ably.Types.Message,
                 setStatus(info.contentId)
             } else {
                 console.error(`Invalid content id: ${info.contentId}.  Please report a bug!`)
-                alert("Communication error: invalid channel id!")
-                terminate()
+                sendDrop(channel)
+                exit(`There was a communication error (invalid channel id).  Please report a bug.`)
             }
             break
         case 'listenAuthNo':
             console.log(`Whisperer refused listener presence`)
-            setStatus('denied')
-            setTimeout(terminate, 1000)
+            sendDrop(channel)
+            exit(`${whispererName} has refused to let you join this conversation`)
             break
         case 'whisperOffer':
             console.log(`Received Whisper offer, sending request`)
@@ -381,6 +377,12 @@ function parseContentOffset(offset: number) {
     }
 }
 
+function sendDrop(channel: Ably.Types.RealtimeChannelPromise) {
+    console.log(`Sending drop message`)
+    let chunk = `${controlOffsetValue('dropping')}|||${clientId}|||`
+    channel.publish("whisperer", chunk).then()
+}
+
 function sendListenOffer(channel: Ably.Types.RealtimeChannelPromise) {
     console.log(`Sending listen offer`)
     let chunk = `${controlOffsetValue('listenOffer')}|${conversationId}||${clientId}|${clientId}||`
@@ -397,6 +399,14 @@ function sendRereadText(channel: Ably.Types.RealtimeChannelPromise) {
     // request the whisperer to send all the text
     let chunk = `${controlOffsetValue('requestReread')}|live`
     channel.publish("whisperer", chunk).then()
+}
+
+function hookUnload(fn: () => void) {
+    useEffect(() => {
+        const handleClose = () => fn()
+        window.addEventListener('beforeunload', handleClose)
+        return () => { window.removeEventListener('beforeunload', handleClose)}
+    }, []);
 }
 
 const doneCounts: {[p: string]: number} = { }

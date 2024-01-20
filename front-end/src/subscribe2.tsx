@@ -353,7 +353,7 @@ function parseContentChunk(chunk: String) {
         return undefined
     }
     const offsetNum = parseInt(parts[1])
-    if (!offsetNum) {
+    if (isNaN(offsetNum)) {
         return undefined
     }
     const parsed: ContentChunk = {
@@ -403,7 +403,12 @@ function sendRereadText(channel: Ably.Types.RealtimeChannelPromise) {
 
 function hookUnload(fn: () => void) {
     useEffect(() => {
-        const handleClose = () => fn()
+        const handleClose = (event: BeforeUnloadEvent) => {
+            event.preventDefault()
+            console.log("Running beforeunload hook...")
+            fn()
+            return (event.returnValue = 'Are you sure you want to exit?')
+        }
         window.addEventListener('beforeunload', handleClose)
         return () => { window.removeEventListener('beforeunload', handleClose)}
     }, []);

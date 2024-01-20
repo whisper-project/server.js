@@ -13,6 +13,10 @@ body {
     padding: 5px;
 }
 
+#connectButton {
+    padding: 5px;
+}
+
 #liveText {
     box-sizing: border-box;
     width: 100%;

@@ -87,8 +87,8 @@ function NameView(props: { name: String, setName: React.Dispatch<React.SetStateA
 }
 
 function DisconnectedView(props: { message: string }) {
-    console.log("Closing all connections")
-    client.close()
+    console.log("Waiting a second to drain messages, then closing client")
+    setTimeout(() => client.close(), 1000)
     return (
         <>
             <h1>Disconnected from conversation “{conversationName}”</h1>
@@ -111,15 +111,19 @@ function ConnectView(props: { exit: (msg: string) => void }) {
     if (status.match(/^[A-Za-z0-9-]{36}$/)) {
         return <ConnectedView contentId={status} reread={rereadLiveText} />
     } else {
-        return <ConnectingView status={status} />
+        return <ConnectingView status={status} setStatus={setStatus} />
     }
 }
 
-function ConnectingView(props: { status: string }) {
+function ConnectingView(props: { status: string, setStatus: React.Dispatch<React.SetStateAction<string>> }) {
     let message: string
+    const onPress = () => props.setStatus('waiting')
     switch (props.status) {
         case 'initial':
-            message = `Starting to connect...`
+            message = `Press the button to join the conversation.`
+            break
+        case 'waiting':
+            message = `Waiting for ${whispererName} to join...`
             break
         case 'requesting':
             message = `Requesting permission to join the conversation...`
@@ -127,18 +131,36 @@ function ConnectingView(props: { status: string }) {
         default:
             message = `Something has gone wrong (invalid status ${props.status}).  Please try refreshing this window.`
     }
-    return (
-        <>
-            <h1>Conversation “{conversationName}” with {whispererName}</h1>
-            <form>
-                <textarea rows={1} id="status" value={message} />
-            </form>
-        </>
-    )
+    if (props.status == 'initial') {
+        return (
+            <>
+                <h1>Conversation “{conversationName}” with {whispererName}</h1>
+                <form>
+                    <textarea rows={1} id="status" value={message} />
+                </form>
+            </>
+        )
+    } else {
+        return (
+            <>
+                <h1>Conversation “{conversationName}” with {whispererName}</h1>
+                <form>
+                    <textarea rows={1} id="status" value={message}/>
+                    <button
+                        id="connectButton"
+                        type="button"
+                        onClick={onPress}
+                    >
+                        Join Conversation
+                    </button>
+                </form>
+            </>
+        )
+    }
 }
 
 function ConnectedView(props: { contentId: string, reread: () => void }) {
-    const [text, updateText] = useState({ live: '', past: '' } as Text)
+    const [text, updateText] = useState({live: '', past: ''} as Text)
     useChannel(
         `${conversationId}:${props.contentId}`,
         (m) => receiveContentChunk(m, updateText, props.reread)

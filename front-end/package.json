@@ -1,7 +1,10 @@
 {
   "targets": {
     "default": {
-      "source": ["src/index1.html", "src/index2.html"],
+      "source": [
+        "src/index1.html",
+        "src/index2.html"
+      ],
       "distDir": "../back-end/public/listen",
       "publicUrl": "/listen"
     }
@@ -11,13 +14,13 @@
     "build": "rm -f ../back-end/public/listen/* && parcel build --no-cache --no-source-maps"
   },
   "dependencies": {
-    "@types/js-cookie": "^3.0.3",
     "ably": "^1.2.48",
     "js-cookie": "^3.0.5",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@types/js-cookie": "^3.0.6",
     "@types/react": "^18.2.21",
     "@types/react-dom": "^18.2.7",
     "buffer": "^6.0.3",

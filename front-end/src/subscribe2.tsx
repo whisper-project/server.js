@@ -7,6 +7,17 @@ import Cookies from 'js-cookie'
 import {AblyProvider, useChannel} from 'ably/react'
 import * as Ably from 'ably'
 
+import Typography from '@mui/material/Typography'
+import Button from '@mui/material/Button'
+import Grid from '@mui/material/Grid'
+import Stack from '@mui/material/Stack'
+import TextField from '@mui/material/TextField'
+
+import '@fontsource/roboto/300.css'
+import '@fontsource/roboto/400.css'
+import '@fontsource/roboto/500.css'
+import '@fontsource/roboto/700.css'
+
 const conversationId = Cookies.get('conversationId') || ''
 const conversationName = Cookies.get('conversationName') || ''
 const whispererName = Cookies.get('whispererName') || ''
@@ -30,9 +41,9 @@ interface Text {
 
 export default function ListenerView() {
     const [exitMsg, setExitMsg] = useState('')
-    const [listenerName, setListenerName] = useState(clientName)
+    const [listenerName, setListenerName] = useState('')
     if (!listenerName) {
-        return <NameView name={listenerName} setName={setListenerName} />
+        return <NameView confirm={(msg) => setListenerName(msg)} />
     } else if (exitMsg) {
         return <DisconnectedView message={exitMsg}/>
     } else {
@@ -44,45 +55,51 @@ export default function ListenerView() {
     }
 }
 
-function NameView(props: { name: String, setName: React.Dispatch<React.SetStateAction<string>>} ) {
-    const [client, updateClient] = useState(props.name)
+function NameView(props: { confirm: (msg: string) => void} ) {
+    const [name, setName] = useState(clientName)
 
     function onChange(e: React.ChangeEvent<HTMLInputElement>) {
-        clientName = e.target.value
-        updateClient(clientName)
+        setName(e.target.value)
     }
 
-    function onUpdate() {
-        props.setName(clientName)
+    function onConfirm() {
+        clientName = name
         Cookies.set('clientName', clientName, { expires: 365 })
+        props.confirm(name)
     }
 
     return (
-        <>
-            <h1>Advisory</h1>
-            <p>
+        <Stack spacing={5}>
+            <Typography variant="h4" gutterBottom>
+                Advisory
+            </Typography>
+            <Typography maxWidth={'60ch'}>
                 By entering your name below, you are agreeing to receive
                 messages sent by another user (the Whisperer) in
-                a remote location.  Your name and agreement will be remembered
-                in this browser for all conversations with all Whisperers
-                until you clear your browser's cookies for this site.
-            </p>
-            <h2>Please provide your name to the Whisperer:</h2>
-            <input
-                name="listenerName"
-                id="listenerName"
-                type="text"
-                value={client.valueOf()}
-                onChange={onChange}
-            />
-            <button
-                id="updateButton"
-                type="button"
-                onClick={onUpdate}
-            >
-                Agree & Save Name
-            </button>
-        </>
+                a remote location.  The name you enter here will be
+                revealed to that person.
+            </Typography>
+            <Typography variant="h5" gutterBottom>
+                Please provide your name to the Whisperer:
+            </Typography>
+            <Grid container component="form" noValidate autoComplete="off">
+                <Grid item>
+                    <TextField
+                        id="outlined-basic"
+                        label="Listener Name"
+                        variant="outlined"
+                        style={{ width: '40ch' }}
+                        value={name}
+                        onChange={onChange}
+                    />
+                </Grid>
+                <Grid item alignItems="stretch" style={{ display: 'flex' }}>
+                    <Button variant="contained" onClick={onConfirm}>
+                        Agree & Provide Name
+                    </Button>
+                </Grid>
+            </Grid>
+        </Stack>
     )
 }
 
@@ -90,38 +107,46 @@ function DisconnectedView(props: { message: string }) {
     console.log("Waiting a second to drain messages, then closing client")
     setTimeout(() => client.close(), 1000)
     return (
-        <>
-            <h1>Disconnected from conversation “{conversationName}”</h1>
-            <p>{props.message}</p>
-            <p>
+        <Stack spacing={5}>
+            <Typography variant="h4">Disconnected from conversation “{conversationName}”</Typography>
+            {props.message != 'user-initiated-disconnect' && <Typography>{props.message}</Typography>}
+            <Typography>
                 You can close this window or <a href={window.location.href}>click here to listen again</a>.
-            </p>
-        </>
+            </Typography>
+        </Stack>
     )
 }
 
 function ConnectView(props: { exit: (msg: string) => void }) {
-    const [status, setStatus] = useState(`initial`)
+    const [status, setStatus] = useState('waiting')
     const { channel } = useChannel(
         `${conversationId}:control`,
         m => receiveControlChunk(m, channel, setStatus, props.exit))
-    hookUnload(() => sendDrop(channel) )
+    hookUnload(() => {
+        sendDrop(channel)
+        setTimeout(() => props.exit('Trying to close the window closes the connection.'), 1000)
+    })
+    const exit = (msg: string) => {
+        sendDrop(channel)
+        props.exit(msg)
+    }
     doCount(() => sendListenOffer(channel), 'initialOffer', 1)
     const rereadLiveText = () => sendRereadText(channel)
-    if (status.match(/^[A-Za-z0-9-]{36}$/)) {
-        return <ConnectedView contentId={status} reread={rereadLiveText} />
-    } else {
-        return <ConnectingView status={status} setStatus={setStatus} />
-    }
+    return (
+        <Stack spacing={5}>
+            <Typography variant="h4">Conversation “{conversationName}” with {whispererName}</Typography>
+            <StatusView status={status} exit={exit}/>
+            {status.match(/^[A-Za-z0-9-]{36}$/) &&
+                <ConversationView contentId={status} reread={rereadLiveText}/>
+            }
+        </Stack>
+    )
 }
 
-function ConnectingView(props: { status: string, setStatus: React.Dispatch<React.SetStateAction<string>> }) {
+function StatusView(props: { status: string, exit: (msg: string) => void }) {
     let message: string
-    const onPress = () => props.setStatus('waiting')
+    const disconnect = () => props.exit('user-initiated-disconnect')
     switch (props.status) {
-        case 'initial':
-            message = `Press the button to join the conversation.`
-            break
         case 'waiting':
             message = `Waiting for ${whispererName} to join...`
             break
@@ -129,65 +154,63 @@ function ConnectingView(props: { status: string, setStatus: React.Dispatch<React
             message = `Requesting permission to join the conversation...`
             break
         default:
-            message = `Something has gone wrong (invalid status ${props.status}).  Please try refreshing this window.`
+            if (props.status.match(/^[A-Za-z0-9-]{36}$/)) {
+                message = "Connected and listening..."
+            } else {
+                message = `Something has gone wrong (invalid status ${props.status}).`
+                setTimeout(
+                    () => props.exit(`A connection error occurred.  Please try refreshing this window.`),
+                    250
+                )
+            }
     }
-    if (props.status == 'initial') {
-        return (
-            <>
-                <h1>Conversation “{conversationName}” with {whispererName}</h1>
-                <form>
-                    <textarea rows={1} id="status" value={message} />
-                </form>
-            </>
-        )
-    } else {
-        return (
-            <>
-                <h1>Conversation “{conversationName}” with {whispererName}</h1>
-                <form>
-                    <textarea rows={1} id="status" value={message}/>
-                    <button
-                        id="connectButton"
-                        type="button"
-                        onClick={onPress}
-                    >
-                        Join Conversation
-                    </button>
-                </form>
-            </>
-        )
-    }
+    return (
+        <Grid container component="form" noValidate autoComplete="off">
+            <Grid item>
+                <TextField
+                    id="outlined-basic"
+                    label="Connection Status"
+                    variant="outlined"
+                    style={{ width: '60ch' }}
+                    value={message}
+                    disabled
+                />
+            </Grid>
+            <Grid item alignItems="stretch" style={{ display: 'flex' }}>
+                <Button variant="contained" onClick={disconnect}>
+                    Leave Conversation
+                </Button>
+            </Grid>
+        </Grid>
+    )
 }
 
-function ConnectedView(props: { contentId: string, reread: () => void }) {
+function ConversationView(props: { contentId: string, reread: () => void }) {
     const [text, updateText] = useState({live: '', past: ''} as Text)
     useChannel(
         `${conversationId}:${props.contentId}`,
         (m) => receiveContentChunk(m, updateText, props.reread)
     )
+    doCount(props.reread, 'initialRead', 1)
     return (
-        <>
-            <h1>Conversation “{conversationName}” with {whispererName}</h1>
-            <form>
-                <LivePastText text={text} reread={props.reread}/>
-            </form>
-        </>
+        <LivePastText text={text} />
     )
 }
 
-function LivePastText(props: { text: Text, reread: () => void }) {
-    doCount(props.reread, 'initialRead', 1)
+function LivePastText(props: { text: Text }) {
     return (
         <>
-            <textarea
-                id="liveText"
-                rows={10}
+            <TextField
+                multiline
+                disabled
+                rows={3}
                 value={props.text.live}
             />
-            <textarea
+            <TextField
+                multiline
+                disabled
                 id="pastText"
-                rows={30}
-                readOnly={true}
+                rows={15}
                 value={props.text.past}
             />
         </>
@@ -291,6 +314,7 @@ function receiveContentChunk(message: Ably.Types.Message,
             const offset = chunk.offset as number
             updateText((text: Text): Text => {
                 if (offset > text.live.length) {
+                    console.log(`Received offset ${offset} with text length ${text.live.length}, rereading...`)
                     reread()
                     return text
                 } else {
@@ -370,7 +394,7 @@ interface ContentChunk {
 }
 
 function parseContentChunk(chunk: String) {
-    const parts = chunk.match(/^(-?[0-9]+)|(.*)$/)
+    const parts = chunk.match(/^(-?[0-9]+)\|(.*)$/)
     if (!parts || parts.length != 3) {
         return undefined
     }
@@ -381,7 +405,7 @@ function parseContentChunk(chunk: String) {
     const parsed: ContentChunk = {
         isDiff: offsetNum >= -1,
         offset: parseContentOffset(offsetNum) || offsetNum,
-        text: parts[2]
+        text: parts[2] || ''
     }
     return parsed
 }
@@ -426,10 +450,10 @@ function sendRereadText(channel: Ably.Types.RealtimeChannelPromise) {
 function hookUnload(fn: () => void) {
     useEffect(() => {
         const handleClose = (event: BeforeUnloadEvent) => {
-            event.preventDefault()
             console.log("Running beforeunload hook...")
+            event.preventDefault()
             fn()
-            return (event.returnValue = 'Are you sure you want to exit?')
+            return (event.returnValue = 'Are you sure? Closing the window will close the connection.')
         }
         window.addEventListener('beforeunload', handleClose)
         return () => { window.removeEventListener('beforeunload', handleClose)}

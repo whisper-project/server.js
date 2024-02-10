@@ -18,14 +18,14 @@ async function testAbly() {
         "Publish token doesn't authorize control channel publish")
     assert(pubCaps[`${conversationId}:control`].includes('subscribe'),
         "Publish token doesn't authorize control channel subscribe")
-    assert(!pubCaps[`${conversationId}:control`].includes('presence'),
-        "Publish token authorizes control channel presence")
+    assert(pubCaps[`${conversationId}:control`].includes('presence'),
+        "Publish token doesn't authorize control channel presence")
     assert(pubCaps[`${conversationId}:${contentId}`].includes('publish'),
         "Publish token doesn't authorize content channel publish")
     assert(!pubCaps[`${conversationId}:${contentId}`].includes('subscribe'),
         "Publish token authorizes control content subscribe")
     assert(!pubCaps[`${conversationId}:${contentId}`].includes('presence'),
-        "Publish token authorizes control channel presence")
+        "Publish token authorizes content channel presence")
     const subRequest = await createAblySubscribeTokenRequest(clientId, conversationId)
     assert(subRequest.clientId === clientId, "Subscribe token's client key is wrong")
     const subCaps = JSON.parse(subRequest.capability)
@@ -33,8 +33,8 @@ async function testAbly() {
         "Subscribe token doesn't authorize control channel publish")
     assert(subCaps[`${conversationId}:control`].includes('subscribe'),
         "Subscribe token doesn't authorize control channel subscribe")
-    assert(!subCaps[`${conversationId}:control`].includes('presence'),
-        "Subscribe token authorizes control channel presence")
+    assert(subCaps[`${conversationId}:control`].includes('presence'),
+        "Subscribe token doesn't authorize control channel presence")
     assert(!subCaps[`${conversationId}:*`].includes('publish'),
         "Subscribe token authorizes content channel publish")
     assert(subCaps[`${conversationId}:*`].includes('subscribe'),

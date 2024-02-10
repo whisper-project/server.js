@@ -10,7 +10,7 @@ export async function createAblyPublishTokenRequest(
     const config = getSettings()
     const ably = new Ably.Rest({ key: config.ablyPublishKey })
     const tokenCaps = {}
-    tokenCaps[`${conversationId}:control`] = ['publish', 'subscribe']
+    tokenCaps[`${conversationId}:control`] = ['publish', 'subscribe', 'presence']
     tokenCaps[`${conversationId}:${contentId}`] = ['publish']
     const tokenParams = {
         clientId,
@@ -23,7 +23,7 @@ export async function createAblySubscribeTokenRequest(clientId: string, conversa
     const config = getSettings()
     const ably = new Ably.Rest({ key: config.ablyPublishKey })
     const tokenCaps = {}
-    tokenCaps[`${conversationId}:control`] = ['publish', 'subscribe']
+    tokenCaps[`${conversationId}:control`] = ['publish', 'subscribe', 'presence']
     tokenCaps[`${conversationId}:*`] = ['subscribe']
     const tokenParams = {
         clientId,

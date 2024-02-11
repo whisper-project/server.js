@@ -4,7 +4,7 @@
 
 import React, {useEffect, useState} from 'react'
 import Cookies from 'js-cookie'
-import {AblyProvider, useChannel} from 'ably/react'
+import { AblyProvider, useChannel, usePresence } from 'ably/react'
 import * as Ably from 'ably'
 
 import Typography from '@mui/material/Typography'
@@ -122,9 +122,9 @@ function ConnectView(props: { exit: (msg: string) => void }) {
     const { channel } = useChannel(
         `${conversationId}:control`,
         m => receiveControlChunk(m, channel, setStatus, props.exit))
+    const { updateStatus } = usePresence(`${conversationId}:control`, 'connect')
     hookUnload(() => {
-        sendDrop(channel)
-        setTimeout(() => props.exit('Trying to close the window closes the connection.'), 1000)
+        updateStatus('dropping')
     })
     const exit = (msg: string) => {
         sendDrop(channel)
@@ -171,7 +171,7 @@ function StatusView(props: { status: string, exit: (msg: string) => void }) {
                     id="outlined-basic"
                     label="Connection Status"
                     variant="outlined"
-                    style={{ width: '60ch' }}
+                    style={{ width: '50ch' }}
                     value={message}
                     disabled
                 />
@@ -198,20 +198,30 @@ function ConversationView(props: { contentId: string, reread: () => void }) {
 }
 
 function LivePastText(props: { text: Text }) {
+    const preventDefault = (event: React.ClipboardEvent<HTMLInputElement>, message: string) => {
+        console.log(message)
+        event.preventDefault()
+    }
+    const disableCopy = (e: React.ClipboardEvent<HTMLInputElement>) => preventDefault(e,'Copy blocked')
+    const disableCut = (e: React.ClipboardEvent<HTMLInputElement>) => preventDefault(e, 'Cut blocked')
     return (
         <>
             <TextField
                 multiline
-                disabled
-                rows={3}
-                value={props.text.live}
+                label={`Live Typing`}
+                minRows={2}
+                value={props.text.live || ' '}
+                onCopy={disableCopy}
+                onCut={disableCut}
             />
             <TextField
                 multiline
-                disabled
+                label={`Past Typing`}
                 id="pastText"
-                rows={15}
-                value={props.text.past}
+                minRows={15}
+                value={props.text.past || ' '}
+                onCopy={disableCopy}
+                onCut={disableCut}
             />
         </>
     )
@@ -449,11 +459,9 @@ function sendRereadText(channel: Ably.Types.RealtimeChannelPromise) {
 
 function hookUnload(fn: () => void) {
     useEffect(() => {
-        const handleClose = (event: BeforeUnloadEvent) => {
+        const handleClose = () => {
             console.log("Running beforeunload hook...")
-            event.preventDefault()
             fn()
-            return (event.returnValue = 'Are you sure? Closing the window will close the connection.')
         }
         window.addEventListener('beforeunload', handleClose)
         return () => { window.removeEventListener('beforeunload', handleClose)}

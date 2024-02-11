@@ -74,13 +74,16 @@ function NameView(props: { confirm: (msg: string) => void} ) {
                 Advisory
             </Typography>
             <Typography maxWidth={'60ch'}>
-                By entering your name below, you are agreeing to receive
-                messages sent by another user (the Whisperer) in
-                a remote location.  The name you enter here will be
-                revealed to that person.
+                By entering your name below, you are agreeing to engage
+                in a conversation called “{conversationName}”
+                with the user “{whispererName}”.
+                The name you enter here will be
+                revealed to that person, and what they type will
+                appear for you to see.  If you don't wish
+                to participate in this conversation, just close this window.
             </Typography>
             <Typography variant="h5" gutterBottom>
-                Please provide your name to the Whisperer:
+                Please provide your name to {whispererName}:
             </Typography>
             <Grid container component="form" noValidate autoComplete="off">
                 <Grid item>

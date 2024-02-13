@@ -16,6 +16,7 @@ export interface ClientData {
     appInfo?: string,
     userName?: string,      // used in v1
     profileId?: string,     // used in v2
+    profileTimestamp?: number
 }
 
 export async function getClientData(clientKey: string) {
@@ -30,16 +31,15 @@ export async function getClientData(clientKey: string) {
     if (typeof existing?.secretDate === "string") {
         existing.secretDate = parseInt(existing.secretDate)
     }
+    if (typeof existing?.profileTimestamp === 'string') {
+        existing.profileTimestamp = parseInt(existing.profileTimestamp)
+    }
     return existing as unknown as ClientData
 }
 
 export async function setClientData(clientKey: string, clientData: ClientData) {
-    const update = {}
-    for (const key in clientData) {
-        update[key] = clientData[key].toString()
-    }
     const rc = await getDb()
-    await rc.hSet(dbKeyPrefix + clientKey, update)
+    await rc.hSet(dbKeyPrefix + clientKey, { ...clientData })
 }
 
 export interface HasClientChanged {
@@ -64,13 +64,35 @@ export async function hasClientChanged(clientKey: string, received: ClientData) 
         clientChanged = true
         changeReason = "new APNS token from existing"
     }
-    if (!clientChanged && received.userName !== existing?.userName) {
-        clientChanged = true
-        changeReason = "new user data from existing"
-    }
     if (!clientChanged && received.appInfo !== existing?.appInfo) {
         clientChanged = true
         changeReason = "new build data from existing"
     }
     return {clientChanged, changeReason} as HasClientChanged
+}
+
+export interface ProfileData {
+    id: string
+    timestamp: number
+    profile: string
+}
+
+export async function getProfileData(id: string) {
+    const rc = await getDb()
+    const profileKey = dbKeyPrefix + `pro:${id}`
+    const dbData: {[index:string]: string} = await rc.hGetAll(profileKey)
+    if (!dbData?.id || !dbData?.timestamp || !dbData?.profileData) {
+        return undefined
+    }
+    return {
+        id: dbData.id,
+        timestamp: parseInt(dbData.timestamp),
+        profile: dbData.profileData,
+    } as ProfileData
+}
+
+export async function saveProfileData(profileData: ProfileData) {
+    const rc = await getDb()
+    const profileKey = dbKeyPrefix + `pro:${profileData.id}`
+    await rc.hSet(profileKey, { ...profileData })
 }

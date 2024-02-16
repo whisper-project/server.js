@@ -73,21 +73,23 @@ export async function hasClientChanged(clientKey: string, received: ClientData) 
 
 export interface ProfileData {
     id: string
-    timestamp: number
-    profile: string
+    name?: string
+    password?: string
+    whisperProfile?: string
 }
 
 export async function getProfileData(id: string) {
     const rc = await getDb()
     const profileKey = dbKeyPrefix + `pro:${id}`
     const dbData: {[index:string]: string} = await rc.hGetAll(profileKey)
-    if (!dbData?.id || !dbData?.timestamp || !dbData?.profileData) {
+    if (!dbData?.id) {
         return undefined
     }
     return {
         id: dbData.id,
-        timestamp: parseInt(dbData.timestamp),
-        profile: dbData.profileData,
+        name: dbData.name,
+        password: dbData.password,
+        whisperProfile: dbData?.whisperProfile
     } as ProfileData
 }
 

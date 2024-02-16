@@ -3,12 +3,13 @@
 // See the LICENSE file for details.
 
 import express from 'express'
-import {randomUUID} from 'crypto'
+import { randomUUID } from 'crypto'
 
-import {createAblyPublishTokenRequest, createAblySubscribeTokenRequest} from './auth.js'
-import {subscribe_response} from './templates.js'
-import {validateClientJwt} from '../auth.js'
-import {ConversationInfo, getConversationInfo, setConversationInfo} from '../conversation.js'
+import { createAblyPublishTokenRequest, createAblySubscribeTokenRequest } from './auth.js'
+import { subscribe_response } from './templates.js'
+import { validateClientJwt } from '../auth.js'
+import { ConversationInfo, getConversationInfo, setConversationInfo } from '../conversation.js'
+import { getProfileData, ProfileData, saveProfileData } from '../client.js'
 
 export async function pubSubTokenRequest(req: express.Request, res: express.Response) {
     const body: { [p: string]: string } = req.body
@@ -101,4 +102,165 @@ export async function listenTokenRequest(req: express.Request, res: express.Resp
     console.log(`Listen token request from web client ${clientId} to conversation ${conversationId}`)
     const tokenRequest = await createAblySubscribeTokenRequest(clientId, conversationId)
     res.status(200).send(tokenRequest)
+}
+
+export async function userProfilePost(req: express.Request, res: express.Response) {
+    const body: { [p: string]: string } = req.body
+    if (!body.id || !body.name || !body.password) {
+        console.log(`User profile post is missing data`)
+        res.status(400).send({ status: `error`, reason: `Invalid post data` });
+        return
+    }
+    const existingData = await getProfileData(body.id)
+    if (existingData) {
+        console.error(`User profile post for ${body.id} but the profile exists`)
+        res.status(409).send({status: `error`, reason: `Profile ${body.id} already exists`})
+        return
+    }
+    const newData: ProfileData = {
+        id: body.id,
+        name: body.name,
+        password: body.password
+    }
+    await saveProfileData(newData)
+    res.status(201).send()
+}
+
+export async function userProfilePut(req: express.Request, res: express.Response) {
+    const body: { [p: string]: string } = req.body
+    const profileId = req.params?.profileId
+    if (!profileId || !body?.name) {
+        console.log(`User profile put is missing data`)
+        res.status(400).send({ status: `error`, reason: `Invalid put data` });
+        return
+    }
+    const existingData = await getProfileData(profileId)
+    if (!existingData) {
+        console.error(`User profile put for ${profileId} but the profile does not exist`)
+        res.status(404).send({status: `error`, reason: `Profile ${profileId} doesn't exist`})
+        return
+    }
+    const auth = req.header('Authorization')
+    if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
+        console.log(`Missing or invalid authorization header: ${auth}`)
+        res.status(403).send({ status: 'error', reason: 'Invalid authorization header' })
+        return
+    }
+    if (auth.substring(7) != existingData.password) {
+        console.error(`User profile put has incorrect password`)
+        res.status(403).send({status: `error`, reason: `Invalid authorization` })
+        return
+    }
+    existingData.name = body.name
+    await saveProfileData(existingData)
+    res.status(204).send()
+}
+
+export async function userProfileGet(req: express.Request, res: express.Response) {
+    const profileId = req.params?.profileId
+    if (!profileId) {
+        console.log(`No profile ID specified in GET`)
+        res.status(404).send({ status: `error`, reason: `No such profile` });
+        return
+    }
+    const existingData = await getProfileData(profileId)
+    if (!existingData || !existingData?.password) {
+        console.error(`User profile get for ${profileId} but the profile does not exist`)
+        res.status(404).send({status: `error`, reason: `Profile ${profileId} doesn't exist`})
+        return
+    }
+    const auth = req.header('Authorization')
+    if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
+        console.log(`Missing or invalid authorization header: ${auth}`)
+        res.status(403).send({ status: 'error', reason: 'Invalid authorization header' })
+        return
+    }
+    if (auth.substring(7) != existingData.password) {
+        console.error(`User profile put has incorrect password`)
+        res.status(403).send({status: `error`, reason: `Invalid authorization` })
+        return
+    }
+    const body = { id: existingData.id, name: existingData.name }
+    res.status(200).send(body)
+}
+
+export async function whisperProfilePost(req: express.Request, res: express.Response) {
+    const body: { [p: string]: string } = req.body
+    if (!body.id) {
+        console.log(`Whisper profile post is missing data`)
+        res.status(400).send({ status: `error`, reason: `Invalid post data` });
+        return
+    }
+    const existingData = await getProfileData(body.id)
+    if (!existingData || !existingData.password) {
+        console.warn(`Whisper profile post for ${body.id} precedes user profile post`)
+    }
+    if (existingData && existingData?.whisperProfile) {
+        console.error(`Whisper profile post for ${body.id} but the whisper profile exists`)
+        res.status(409).send({status: `error`, reason: `Profile ${body.id} already exists`})
+        return
+    }
+    const newData: ProfileData = {
+        id: body.id,
+        whisperProfile: JSON.stringify(body)
+    }
+    await saveProfileData(newData)
+    res.status(201).send()
+}
+
+export async function whisperProfilePut(req: express.Request, res: express.Response) {
+    const profileId = req.params?.profileId
+    if (!profileId) {
+        console.log(`Whisper profile put is missing profile ID`)
+        res.status(404).send({ status: `error`, reason: `Invalid Profile ID` });
+        return
+    }
+    const existingData = await getProfileData(profileId)
+    if (!existingData || !existingData.password || !existingData?.whisperProfile) {
+        console.error(`Whisper profile put for ${profileId} but the profile does not exist`)
+        res.status(404).send({status: `error`, reason: `Profile ${profileId} doesn't exist`})
+        return
+    }
+    const auth = req.header('Authorization')
+    if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
+        console.log(`Missing or invalid authorization header: ${auth}`)
+        res.status(403).send({ status: 'error', reason: 'Invalid authorization header' })
+        return
+    }
+    if (auth.substring(7) != existingData.password) {
+        console.error(`Whisper profile put has incorrect password`)
+        res.status(403).send({status: `error`, reason: `Invalid authorization` })
+        return
+    }
+    existingData.whisperProfile = JSON.stringify(req.body)
+    await saveProfileData(existingData)
+    res.status(204).send()
+}
+
+export async function whisperProfileGet(req: express.Request, res: express.Response) {
+    const profileId = req.params?.profileId
+    if (!profileId) {
+        console.log(`No profile ID specified in GET`)
+        res.status(404).send({ status: `error`, reason: `No such profile` });
+        return
+    }
+    const existingData = await getProfileData(profileId)
+    if (!existingData || !existingData?.password || !existingData.whisperProfile) {
+        console.error(`Whisper profile get for ${profileId} but the profile does not exist`)
+        res.status(404).send({status: `error`, reason: `Profile ${profileId} doesn't exist`})
+        return
+    }
+    const auth = req.header('Authorization')
+    if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
+        console.log(`Missing or invalid authorization header: ${auth}`)
+        res.status(403).send({ status: 'error', reason: 'Invalid authorization header' })
+        return
+    }
+    if (auth.substring(7) != existingData.password) {
+        console.error(`User profile put has incorrect password`)
+        res.status(403).send({status: `error`, reason: `Invalid authorization` })
+        return
+    }
+    const body = JSON.parse(existingData.whisperProfile)
+    res.status(200).send(body)
 }

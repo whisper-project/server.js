@@ -112,7 +112,10 @@ export async function userProfilePost(req: express.Request, res: express.Respons
         return
     }
     const existingData = await getProfileData(body.id)
-    if (existingData) {
+    if (existingData?.whisperProfile) {
+        console.warn(`Whisper profile post for ${body.id} preceded user profile post`)
+    }
+    if (existingData?.name) {
         console.error(`User profile post for ${body.id} but the profile exists`)
         res.status(409).send({status: `error`, reason: `Profile ${body.id} already exists`})
         return
@@ -123,6 +126,7 @@ export async function userProfilePost(req: express.Request, res: express.Respons
         password: body.password
     }
     await saveProfileData(newData)
+    console.log(`Successful POST of user profile ${body.id}`)
     res.status(201).send()
 }
 
@@ -135,7 +139,7 @@ export async function userProfilePut(req: express.Request, res: express.Response
         return
     }
     const existingData = await getProfileData(profileId)
-    if (!existingData) {
+    if (!existingData || !existingData?.name) {
         console.error(`User profile put for ${profileId} but the profile does not exist`)
         res.status(404).send({status: `error`, reason: `Profile ${profileId} doesn't exist`})
         return
@@ -153,6 +157,7 @@ export async function userProfilePut(req: express.Request, res: express.Response
     }
     existingData.name = body.name
     await saveProfileData(existingData)
+    console.log(`Successful PUT of user profile ${existingData.id}`)
     res.status(204).send()
 }
 
@@ -164,7 +169,7 @@ export async function userProfileGet(req: express.Request, res: express.Response
         return
     }
     const existingData = await getProfileData(profileId)
-    if (!existingData || !existingData?.password) {
+    if (!existingData || !existingData?.name || !existingData?.password) {
         console.error(`User profile get for ${profileId} but the profile does not exist`)
         res.status(404).send({status: `error`, reason: `Profile ${profileId} doesn't exist`})
         return
@@ -186,6 +191,7 @@ export async function userProfileGet(req: express.Request, res: express.Response
         res.status(412).send({status: `error`, reason: `Server name matches client name`})
         return
     }
+    console.log(`Successful GET of user profile ${existingData.id}`)
     const body = { id: existingData.id, name: existingData.name }
     res.setHeader("ETag", `"${existingData.name}"`)
     res.status(200).send(body)
@@ -199,10 +205,10 @@ export async function whisperProfilePost(req: express.Request, res: express.Resp
         return
     }
     const existingData = await getProfileData(body.id)
-    if (!existingData || !existingData.password) {
+    if (existingData?.name) {
         console.warn(`Whisper profile post for ${body.id} precedes user profile post`)
     }
-    if (existingData && existingData?.whisperProfile) {
+    if (existingData?.whisperProfile) {
         console.error(`Whisper profile post for ${body.id} but the whisper profile exists`)
         res.status(409).send({status: `error`, reason: `Profile ${body.id} already exists`})
         return
@@ -213,6 +219,7 @@ export async function whisperProfilePost(req: express.Request, res: express.Resp
         whisperProfile: JSON.stringify(body)
     }
     await saveProfileData(newData)
+    console.log(`Successful POST of whisper profile ${body.id}`)
     res.status(201).send()
 }
 
@@ -229,7 +236,7 @@ export async function whisperProfilePut(req: express.Request, res: express.Respo
         return
     }
     const existingData = await getProfileData(profileId)
-    if (!existingData || !existingData?.password || !existingData?.whisperTimestamp || !existingData?.whisperProfile) {
+    if (!existingData?.password || !existingData?.whisperTimestamp || !existingData?.whisperProfile) {
         console.error(`Whisper profile put for ${profileId} but the profile does not exist`)
         res.status(404).send({status: `error`, reason: `Profile ${profileId} doesn't exist`})
         return
@@ -249,6 +256,7 @@ export async function whisperProfilePut(req: express.Request, res: express.Respo
         console.error(`Post of whisper profile has older timestamp`)
         res.status(409).send({status: `error`, reason: `Newer version on server`})
     }
+    console.log(`Successful PUT of whisper profile ${existingData.id}`)
     existingData.whisperTimestamp = req.body.timestamp
     existingData.whisperProfile = JSON.stringify(req.body)
     await saveProfileData(existingData)
@@ -263,7 +271,7 @@ export async function whisperProfileGet(req: express.Request, res: express.Respo
         return
     }
     const existingData = await getProfileData(profileId)
-    if (!existingData || !existingData?.password || !existingData?.whisperTimestamp || !existingData.whisperProfile) {
+    if (!existingData || !existingData?.password || !existingData.whisperTimestamp || !existingData.whisperProfile) {
         console.error(`Whisper profile get for ${profileId} but the profile does not exist`)
         res.status(404).send({status: `error`, reason: `Profile ${profileId} doesn't exist`})
         return
@@ -285,6 +293,7 @@ export async function whisperProfileGet(req: express.Request, res: express.Respo
         res.status(412).send({status: `error`, reason: `Server timestamp matches client timestamp`})
         return
     }
+    console.log(`Successful GET of whisper profile ${existingData.id}`)
     res.setHeader("ETag", `"${existingData.whisperTimestamp}"`)
     const body = JSON.parse(existingData.whisperProfile)
     res.status(200).send(body)

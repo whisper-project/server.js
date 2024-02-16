@@ -180,13 +180,20 @@ export async function userProfileGet(req: express.Request, res: express.Response
         res.status(403).send({status: `error`, reason: `Invalid authorization` })
         return
     }
+    const precondition = req.header("If-None-Match")
+    if (precondition && precondition === `"${existingData.name}"`) {
+        console.log(`User profile name matches client-submitted name, returning Precondition Failed`)
+        res.status(412).send({status: `error`, reason: `Server name matches client name`})
+        return
+    }
     const body = { id: existingData.id, name: existingData.name }
+    res.setHeader("ETag", `"${existingData.name}"`)
     res.status(200).send(body)
 }
 
 export async function whisperProfilePost(req: express.Request, res: express.Response) {
     const body: { [p: string]: string } = req.body
-    if (!body.id) {
+    if (!body?.id || !body?.timestamp) {
         console.log(`Whisper profile post is missing data`)
         res.status(400).send({ status: `error`, reason: `Invalid post data` });
         return
@@ -202,6 +209,7 @@ export async function whisperProfilePost(req: express.Request, res: express.Resp
     }
     const newData: ProfileData = {
         id: body.id,
+        whisperTimestamp: body.timestamp,
         whisperProfile: JSON.stringify(body)
     }
     await saveProfileData(newData)
@@ -215,8 +223,13 @@ export async function whisperProfilePut(req: express.Request, res: express.Respo
         res.status(404).send({ status: `error`, reason: `Invalid Profile ID` });
         return
     }
+    if (!req.body || !req.body?.timestamp) {
+        console.error(`Whisper profile put is missing a timestamp`)
+        res.status(400).send({ status: `error`, reason: `Missing timestamp`})
+        return
+    }
     const existingData = await getProfileData(profileId)
-    if (!existingData || !existingData.password || !existingData?.whisperProfile) {
+    if (!existingData || !existingData?.password || !existingData?.whisperTimestamp || !existingData?.whisperProfile) {
         console.error(`Whisper profile put for ${profileId} but the profile does not exist`)
         res.status(404).send({status: `error`, reason: `Profile ${profileId} doesn't exist`})
         return
@@ -232,6 +245,11 @@ export async function whisperProfilePut(req: express.Request, res: express.Respo
         res.status(403).send({status: `error`, reason: `Invalid authorization` })
         return
     }
+    if (existingData.whisperTimestamp > req.body.timestamp) {
+        console.error(`Post of whisper profile has older timestamp`)
+        res.status(409).send({status: `error`, reason: `Newer version on server`})
+    }
+    existingData.whisperTimestamp = req.body.timestamp
     existingData.whisperProfile = JSON.stringify(req.body)
     await saveProfileData(existingData)
     res.status(204).send()
@@ -245,7 +263,7 @@ export async function whisperProfileGet(req: express.Request, res: express.Respo
         return
     }
     const existingData = await getProfileData(profileId)
-    if (!existingData || !existingData?.password || !existingData.whisperProfile) {
+    if (!existingData || !existingData?.password || !existingData?.whisperTimestamp || !existingData.whisperProfile) {
         console.error(`Whisper profile get for ${profileId} but the profile does not exist`)
         res.status(404).send({status: `error`, reason: `Profile ${profileId} doesn't exist`})
         return
@@ -261,6 +279,13 @@ export async function whisperProfileGet(req: express.Request, res: express.Respo
         res.status(403).send({status: `error`, reason: `Invalid authorization` })
         return
     }
+    const precondition = req.header("If-None-Match")
+    if (precondition && precondition === `"${existingData.whisperTimestamp}"`) {
+        console.log(`Whisper profile timestamp matches client-submitted timestamp, returning Precondition Failed`)
+        res.status(412).send({status: `error`, reason: `Server timestamp matches client timestamp`})
+        return
+    }
+    res.setHeader("ETag", `"${existingData.whisperTimestamp}"`)
     const body = JSON.parse(existingData.whisperProfile)
     res.status(200).send(body)
 }

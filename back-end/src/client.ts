@@ -75,6 +75,7 @@ export interface ProfileData {
     id: string
     name?: string
     password?: string
+    whisperTimestamp?: string
     whisperProfile?: string
 }
 

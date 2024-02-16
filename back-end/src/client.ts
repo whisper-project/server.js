@@ -86,12 +86,7 @@ export async function getProfileData(id: string) {
     if (!dbData?.id) {
         return undefined
     }
-    return {
-        id: dbData.id,
-        name: dbData.name,
-        password: dbData.password,
-        whisperProfile: dbData?.whisperProfile
-    } as ProfileData
+    return { ...dbData } as unknown as ProfileData
 }
 
 export async function saveProfileData(profileData: ProfileData) {

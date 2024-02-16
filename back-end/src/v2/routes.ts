@@ -16,7 +16,7 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
     if (!body?.clientId || !body?.activity || !body?.conversationId || !body?.conversationName ||
         !body?.contentId || !body.profileId || !body.username) {
         console.log(`Missing key in pub-sub token request body: ${JSON.stringify(body)}`)
-        res.status(400).send({ status: 'error', reason: 'Invalid post data' });
+        res.status(400).send({ status: 'error', reason: 'Invalid POST data' });
         return
     }
     const { clientId, activity, conversationId, contentId } = body
@@ -107,16 +107,16 @@ export async function listenTokenRequest(req: express.Request, res: express.Resp
 export async function userProfilePost(req: express.Request, res: express.Response) {
     const body: { [p: string]: string } = req.body
     if (!body.id || !body.name || !body.password) {
-        console.log(`User profile post is missing data`)
-        res.status(400).send({ status: `error`, reason: `Invalid post data` });
+        console.log(`User profile POST is missing data`)
+        res.status(400).send({ status: `error`, reason: `Invalid POST data` });
         return
     }
     const existingData = await getProfileData(body.id)
     if (existingData?.whisperProfile) {
-        console.warn(`Whisper profile post for ${body.id} preceded user profile post`)
+        console.warn(`Whisper profile POST for ${body.id} preceded user profile POST`)
     }
     if (existingData?.name) {
-        console.error(`User profile post for ${body.id} but the profile exists`)
+        console.error(`User profile POST for ${body.id} but the profile exists`)
         res.status(409).send({status: `error`, reason: `Profile ${body.id} already exists`})
         return
     }
@@ -134,13 +134,13 @@ export async function userProfilePut(req: express.Request, res: express.Response
     const body: { [p: string]: string } = req.body
     const profileId = req.params?.profileId
     if (!profileId || !body?.name) {
-        console.log(`User profile put is missing data`)
-        res.status(400).send({ status: `error`, reason: `Invalid put data` });
+        console.log(`User profile PUT is missing data`)
+        res.status(400).send({ status: `error`, reason: `Invalid PUT data` });
         return
     }
     const existingData = await getProfileData(profileId)
     if (!existingData || !existingData?.name) {
-        console.error(`User profile put for ${profileId} but the profile does not exist`)
+        console.error(`User profile PUT for ${profileId} but the profile does not exist`)
         res.status(404).send({status: `error`, reason: `Profile ${profileId} doesn't exist`})
         return
     }
@@ -151,7 +151,7 @@ export async function userProfilePut(req: express.Request, res: express.Response
         return
     }
     if (auth.substring(7) != existingData.password) {
-        console.error(`User profile put has incorrect password`)
+        console.error(`User profile PUT has incorrect password`)
         res.status(403).send({status: `error`, reason: `Invalid authorization` })
         return
     }
@@ -170,7 +170,7 @@ export async function userProfileGet(req: express.Request, res: express.Response
     }
     const existingData = await getProfileData(profileId)
     if (!existingData || !existingData?.name || !existingData?.password) {
-        console.error(`User profile get for ${profileId} but the profile does not exist`)
+        console.error(`User profile GET for ${profileId} but the profile does not exist`)
         res.status(404).send({status: `error`, reason: `Profile ${profileId} doesn't exist`})
         return
     }
@@ -181,7 +181,7 @@ export async function userProfileGet(req: express.Request, res: express.Response
         return
     }
     if (auth.substring(7) != existingData.password) {
-        console.error(`User profile put has incorrect password`)
+        console.error(`User profile PUT has incorrect password`)
         res.status(403).send({status: `error`, reason: `Invalid authorization` })
         return
     }
@@ -200,16 +200,16 @@ export async function userProfileGet(req: express.Request, res: express.Response
 export async function whisperProfilePost(req: express.Request, res: express.Response) {
     const body: { [p: string]: string } = req.body
     if (!body?.id || !body?.timestamp) {
-        console.log(`Whisper profile post is missing data`)
-        res.status(400).send({ status: `error`, reason: `Invalid post data` });
+        console.log(`Whisper profile POST is missing data`)
+        res.status(400).send({ status: `error`, reason: `Invalid POST data` });
         return
     }
     const existingData = await getProfileData(body.id)
     if (existingData?.name) {
-        console.warn(`Whisper profile post for ${body.id} precedes user profile post`)
+        console.warn(`Whisper profile POST for ${body.id} precedes user profile POST`)
     }
     if (existingData?.whisperProfile) {
-        console.error(`Whisper profile post for ${body.id} but the whisper profile exists`)
+        console.error(`Whisper profile POST for ${body.id} but the whisper profile exists`)
         res.status(409).send({status: `error`, reason: `Profile ${body.id} already exists`})
         return
     }
@@ -226,18 +226,18 @@ export async function whisperProfilePost(req: express.Request, res: express.Resp
 export async function whisperProfilePut(req: express.Request, res: express.Response) {
     const profileId = req.params?.profileId
     if (!profileId) {
-        console.log(`Whisper profile put is missing profile ID`)
+        console.log(`Whisper profile PUT is missing profile ID`)
         res.status(404).send({ status: `error`, reason: `Invalid Profile ID` });
         return
     }
     if (!req.body || !req.body?.timestamp) {
-        console.error(`Whisper profile put is missing a timestamp`)
+        console.error(`Whisper profile PUT is missing a timestamp`)
         res.status(400).send({ status: `error`, reason: `Missing timestamp`})
         return
     }
     const existingData = await getProfileData(profileId)
     if (!existingData?.password || !existingData?.whisperTimestamp || !existingData?.whisperProfile) {
-        console.error(`Whisper profile put for ${profileId} but the profile does not exist`)
+        console.error(`Whisper profile PUT for ${profileId} but the profile does not exist`)
         res.status(404).send({status: `error`, reason: `Profile ${profileId} doesn't exist`})
         return
     }
@@ -248,7 +248,7 @@ export async function whisperProfilePut(req: express.Request, res: express.Respo
         return
     }
     if (auth.substring(7) != existingData.password) {
-        console.error(`Whisper profile put has incorrect password`)
+        console.error(`Whisper profile PUT has incorrect password`)
         res.status(403).send({status: `error`, reason: `Invalid authorization` })
         return
     }
@@ -257,9 +257,12 @@ export async function whisperProfilePut(req: express.Request, res: express.Respo
         res.status(409).send({status: `error`, reason: `Newer version on server`})
     }
     console.log(`Successful PUT of whisper profile ${existingData.id}`)
-    existingData.whisperTimestamp = req.body.timestamp
-    existingData.whisperProfile = JSON.stringify(req.body)
-    await saveProfileData(existingData)
+    const newData: ProfileData = {
+        id: existingData.id,
+        whisperTimestamp: req.body.timestamp,
+        whisperProfile: JSON.stringify(req.body),
+    }
+    await saveProfileData(newData)
     res.status(204).send()
 }
 
@@ -283,7 +286,7 @@ export async function whisperProfileGet(req: express.Request, res: express.Respo
         return
     }
     if (auth.substring(7) != existingData.password) {
-        console.error(`User profile put has incorrect password`)
+        console.error(`User profile PUT has incorrect password`)
         res.status(403).send({status: `error`, reason: `Invalid authorization` })
         return
     }

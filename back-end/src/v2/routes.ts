@@ -112,9 +112,6 @@ export async function userProfilePost(req: express.Request, res: express.Respons
         return
     }
     const existingData = await getProfileData(body.id)
-    if (existingData?.whisperProfile) {
-        console.warn(`Whisper profile POST for ${body.id} preceded user profile POST`)
-    }
     if (existingData?.name) {
         console.error(`User profile POST for ${body.id} but the profile exists`)
         res.status(409).send({status: `error`, reason: `Profile ${body.id} already exists`})
@@ -205,9 +202,6 @@ export async function whisperProfilePost(req: express.Request, res: express.Resp
         return
     }
     const existingData = await getProfileData(body.id)
-    if (existingData?.name) {
-        console.warn(`Whisper profile POST for ${body.id} precedes user profile POST`)
-    }
     if (existingData?.whisperProfile) {
         console.error(`Whisper profile POST for ${body.id} but the whisper profile exists`)
         res.status(409).send({status: `error`, reason: `Profile ${body.id} already exists`})

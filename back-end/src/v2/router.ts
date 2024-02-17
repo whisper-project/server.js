@@ -10,7 +10,7 @@ import {
     userProfilePost,
     userProfilePut,
     whisperProfilePut,
-    whisperProfilePost, whisperProfileGet, userProfileGet,
+    whisperProfilePost, whisperProfileGet, userProfileGet, listenProfilePost, listenProfilePut, listenProfileGet,
 } from './routes.js'
 import {asyncWrapper, sessionMiddleware} from '../middleware.js'
 import {apnsReceivedNotification, apnsToken} from '../routes.js'
@@ -26,5 +26,8 @@ v2router
     .post('/whisperProfile', asyncWrapper(whisperProfilePost))
     .put('/whisperProfile/:profileId', asyncWrapper(whisperProfilePut))
     .get('/whisperProfile/:profileId', asyncWrapper(whisperProfileGet))
+    .post('/listenProfile', asyncWrapper(listenProfilePost))
+    .put('/listenProfile/:profileId', asyncWrapper(listenProfilePut))
+    .get('/listenProfile/:profileId', asyncWrapper(listenProfileGet))
     .post('/pubSubTokenRequest', asyncWrapper(pubSubTokenRequest))
     .get('/listenTokenRequest', [sessionMiddleware], asyncWrapper(listenTokenRequest))

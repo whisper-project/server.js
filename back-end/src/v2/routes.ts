@@ -295,3 +295,105 @@ export async function whisperProfileGet(req: express.Request, res: express.Respo
     const body = JSON.parse(existingData.whisperProfile)
     res.status(200).send(body)
 }
+
+export async function listenProfilePost(req: express.Request, res: express.Response) {
+    const body: { [p: string]: string } = req.body
+    if (!body?.id || !body?.timestamp) {
+        console.log(`Listen profile POST is missing data`)
+        res.status(400).send({ status: `error`, reason: `Invalid POST data` });
+        return
+    }
+    const existingData = await getProfileData(body.id)
+    if (existingData?.listenProfile) {
+        console.error(`Listen profile POST for ${body.id} but the listen profile exists`)
+        res.status(409).send({status: `error`, reason: `Profile ${body.id} already exists`})
+        return
+    }
+    const newData: ProfileData = {
+        id: body.id,
+        listenTimestamp: body.timestamp,
+        listenProfile: JSON.stringify(body)
+    }
+    await saveProfileData(newData)
+    console.log(`Successful POST of listen profile ${body.id}`)
+    res.status(201).send()
+}
+
+export async function listenProfilePut(req: express.Request, res: express.Response) {
+    const profileId = req.params?.profileId
+    if (!profileId) {
+        console.log(`Listen profile PUT is missing profile ID`)
+        res.status(404).send({ status: `error`, reason: `Invalid Profile ID` });
+        return
+    }
+    if (!req.body || !req.body?.timestamp) {
+        console.error(`Listen profile PUT is missing a timestamp`)
+        res.status(400).send({ status: `error`, reason: `Missing timestamp`})
+        return
+    }
+    const existingData = await getProfileData(profileId)
+    if (!existingData?.password || !existingData?.listenTimestamp || !existingData?.listenProfile) {
+        console.error(`Listen profile PUT for ${profileId} but the profile does not exist`)
+        res.status(404).send({status: `error`, reason: `Profile ${profileId} doesn't exist`})
+        return
+    }
+    const auth = req.header('Authorization')
+    if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
+        console.log(`Missing or invalid authorization header: ${auth}`)
+        res.status(403).send({ status: 'error', reason: 'Invalid authorization header' })
+        return
+    }
+    if (auth.substring(7) != existingData.password) {
+        console.error(`Listen profile PUT has incorrect password`)
+        res.status(403).send({status: `error`, reason: `Invalid authorization` })
+        return
+    }
+    if (existingData.listenTimestamp > req.body.timestamp) {
+        console.error(`Post of listen profile has older timestamp`)
+        res.status(409).send({status: `error`, reason: `Newer version on server`})
+    }
+    console.log(`Successful PUT of listen profile ${existingData.id}`)
+    const newData: ProfileData = {
+        id: existingData.id,
+        listenTimestamp: req.body.timestamp,
+        listenProfile: JSON.stringify(req.body),
+    }
+    await saveProfileData(newData)
+    res.status(204).send()
+}
+
+export async function listenProfileGet(req: express.Request, res: express.Response) {
+    const profileId = req.params?.profileId
+    if (!profileId) {
+        console.log(`No profile ID specified in GET`)
+        res.status(404).send({ status: `error`, reason: `No such profile` });
+        return
+    }
+    const existingData = await getProfileData(profileId)
+    if (!existingData || !existingData?.password || !existingData.listenTimestamp || !existingData.listenProfile) {
+        console.error(`Listen profile get for ${profileId} but the profile does not exist`)
+        res.status(404).send({status: `error`, reason: `Profile ${profileId} doesn't exist`})
+        return
+    }
+    const auth = req.header('Authorization')
+    if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
+        console.log(`Missing or invalid authorization header: ${auth}`)
+        res.status(403).send({ status: 'error', reason: 'Invalid authorization header' })
+        return
+    }
+    if (auth.substring(7) != existingData.password) {
+        console.error(`User profile PUT has incorrect password`)
+        res.status(403).send({status: `error`, reason: `Invalid authorization` })
+        return
+    }
+    const precondition = req.header("If-None-Match")
+    if (precondition && precondition === `"${existingData.listenTimestamp}"`) {
+        console.log(`Listen profile timestamp matches client-submitted timestamp, returning Precondition Failed`)
+        res.status(412).send({status: `error`, reason: `Server timestamp matches client timestamp`})
+        return
+    }
+    console.log(`Successful GET of listen profile ${existingData.id}`)
+    res.setHeader("ETag", `"${existingData.listenTimestamp}"`)
+    const body = JSON.parse(existingData.listenProfile)
+    res.status(200).send(body)
+}

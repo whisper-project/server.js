@@ -77,6 +77,8 @@ export interface ProfileData {
     password?: string
     whisperTimestamp?: string
     whisperProfile?: string
+    listenTimestamp?: string
+    listenProfile?: string
 }
 
 export async function getProfileData(id: string) {

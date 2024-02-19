@@ -204,7 +204,7 @@ export async function whisperProfilePost(req: express.Request, res: express.Resp
     const existingData = await getProfileData(body.id)
     if (existingData?.whisperProfile) {
         console.error(`Whisper profile POST for ${body.id} but the whisper profile exists`)
-        res.status(409).send({status: `error`, reason: `Profile ${body.id} already exists`})
+        res.status(409).send({status: `error`, reason: `Whisper profile ${body.id} already exists`})
         return
     }
     const newData: ProfileData = {
@@ -232,7 +232,7 @@ export async function whisperProfilePut(req: express.Request, res: express.Respo
     const existingData = await getProfileData(profileId)
     if (!existingData?.password || !existingData?.whisperTimestamp || !existingData?.whisperProfile) {
         console.error(`Whisper profile PUT for ${profileId} but the profile does not exist`)
-        res.status(404).send({status: `error`, reason: `Profile ${profileId} doesn't exist`})
+        res.status(404).send({status: `error`, reason: `Whisper profile ${profileId} doesn't exist`})
         return
     }
     const auth = req.header('Authorization')
@@ -248,7 +248,7 @@ export async function whisperProfilePut(req: express.Request, res: express.Respo
     }
     if (existingData.whisperTimestamp > req.body.timestamp) {
         console.error(`Post of whisper profile has older timestamp`)
-        res.status(409).send({status: `error`, reason: `Newer version on server`})
+        res.status(409).send({status: `error`, reason: `Newer whisper profile version on server`})
     }
     console.log(`Successful PUT of whisper profile ${existingData.id}`)
     const newData: ProfileData = {
@@ -270,7 +270,7 @@ export async function whisperProfileGet(req: express.Request, res: express.Respo
     const existingData = await getProfileData(profileId)
     if (!existingData || !existingData?.password || !existingData.whisperTimestamp || !existingData.whisperProfile) {
         console.error(`Whisper profile get for ${profileId} but the profile does not exist`)
-        res.status(404).send({status: `error`, reason: `Profile ${profileId} doesn't exist`})
+        res.status(404).send({status: `error`, reason: `Whisper profile ${profileId} doesn't exist`})
         return
     }
     const auth = req.header('Authorization')
@@ -287,7 +287,7 @@ export async function whisperProfileGet(req: express.Request, res: express.Respo
     const precondition = req.header("If-None-Match")
     if (precondition && precondition === `"${existingData.whisperTimestamp}"`) {
         console.log(`Whisper profile timestamp matches client-submitted timestamp, returning Precondition Failed`)
-        res.status(412).send({status: `error`, reason: `Server timestamp matches client timestamp`})
+        res.status(412).send({status: `error`, reason: `Server whisper timestamp matches client timestamp`})
         return
     }
     console.log(`Successful GET of whisper profile ${existingData.id}`)
@@ -306,7 +306,7 @@ export async function listenProfilePost(req: express.Request, res: express.Respo
     const existingData = await getProfileData(body.id)
     if (existingData?.listenProfile) {
         console.error(`Listen profile POST for ${body.id} but the listen profile exists`)
-        res.status(409).send({status: `error`, reason: `Profile ${body.id} already exists`})
+        res.status(409).send({status: `error`, reason: `Listen profile ${body.id} already exists`})
         return
     }
     const newData: ProfileData = {
@@ -334,7 +334,7 @@ export async function listenProfilePut(req: express.Request, res: express.Respon
     const existingData = await getProfileData(profileId)
     if (!existingData?.password || !existingData?.listenTimestamp || !existingData?.listenProfile) {
         console.error(`Listen profile PUT for ${profileId} but the profile does not exist`)
-        res.status(404).send({status: `error`, reason: `Profile ${profileId} doesn't exist`})
+        res.status(404).send({status: `error`, reason: `Listen profile ${profileId} doesn't exist`})
         return
     }
     const auth = req.header('Authorization')
@@ -350,7 +350,7 @@ export async function listenProfilePut(req: express.Request, res: express.Respon
     }
     if (existingData.listenTimestamp > req.body.timestamp) {
         console.error(`Post of listen profile has older timestamp`)
-        res.status(409).send({status: `error`, reason: `Newer version on server`})
+        res.status(409).send({status: `error`, reason: `Newer listen profile version on server`})
     }
     console.log(`Successful PUT of listen profile ${existingData.id}`)
     const newData: ProfileData = {
@@ -372,7 +372,7 @@ export async function listenProfileGet(req: express.Request, res: express.Respon
     const existingData = await getProfileData(profileId)
     if (!existingData || !existingData?.password || !existingData.listenTimestamp || !existingData.listenProfile) {
         console.error(`Listen profile get for ${profileId} but the profile does not exist`)
-        res.status(404).send({status: `error`, reason: `Profile ${profileId} doesn't exist`})
+        res.status(404).send({status: `error`, reason: `Listen profile ${profileId} doesn't exist`})
         return
     }
     const auth = req.header('Authorization')
@@ -389,7 +389,7 @@ export async function listenProfileGet(req: express.Request, res: express.Respon
     const precondition = req.header("If-None-Match")
     if (precondition && precondition === `"${existingData.listenTimestamp}"`) {
         console.log(`Listen profile timestamp matches client-submitted timestamp, returning Precondition Failed`)
-        res.status(412).send({status: `error`, reason: `Server timestamp matches client timestamp`})
+        res.status(412).send({status: `error`, reason: `Server listen timestamp matches client timestamp`})
         return
     }
     console.log(`Successful GET of listen profile ${existingData.id}`)

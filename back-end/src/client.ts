@@ -10,13 +10,13 @@ export interface ClientData {
     token?: string,
     tokenDate?: number
     lastSecret?: string
-    apnsLastSecret?: string
     secret?: string,
     secretDate?: number,
     pushId?: string,
     appInfo?: string,
     userName?: string,      // used in v1
     profileId?: string,     // used in v2
+    profileTimestamp?: number
 }
 
 export async function getClientData(clientKey: string) {
@@ -25,20 +25,74 @@ export async function getClientData(clientKey: string) {
     if (!existing?.id) {
         return undefined
     }
-    if (existing?.tokenDate === "string") {
+    if (typeof existing?.tokenDate === "string") {
         existing.tokenDate = parseInt(existing.tokenDate)
     }
     if (typeof existing?.secretDate === "string") {
         existing.secretDate = parseInt(existing.secretDate)
     }
+    if (typeof existing?.profileTimestamp === 'string') {
+        existing.profileTimestamp = parseInt(existing.profileTimestamp)
+    }
     return existing as unknown as ClientData
 }
 
 export async function setClientData(clientKey: string, clientData: ClientData) {
-    const update = {}
-    for (const key in clientData) {
-        update[key] = clientData[key].toString()
-    }
     const rc = await getDb()
-    await rc.hSet(dbKeyPrefix + clientKey, update)
+    await rc.hSet(dbKeyPrefix + clientKey, { ...clientData })
+}
+
+export interface HasClientChanged {
+    clientChanged: boolean
+    changeReason: string
+}
+
+export async function hasClientChanged(clientKey: string, received: ClientData) {
+    const existing = await getClientData(clientKey)
+    // see refreshSecret for explanation of logic around lastSecret
+    let clientChanged = false
+    let changeReason = ""
+    if (!existing) {
+        clientChanged = true
+        changeReason = "APNS token from new"
+    }
+    if (!clientChanged && received.lastSecret !== existing?.lastSecret) {
+        clientChanged = true
+        changeReason = "unconfirmed secret from existing"
+    }
+    if (!clientChanged && received.token !== existing?.token) {
+        clientChanged = true
+        changeReason = "new APNS token from existing"
+    }
+    if (!clientChanged && received.appInfo !== existing?.appInfo) {
+        clientChanged = true
+        changeReason = "new build data from existing"
+    }
+    return {clientChanged, changeReason} as HasClientChanged
+}
+
+export interface ProfileData {
+    id: string
+    name?: string
+    password?: string
+    whisperTimestamp?: string
+    whisperProfile?: string
+    listenTimestamp?: string
+    listenProfile?: string
+}
+
+export async function getProfileData(id: string) {
+    const rc = await getDb()
+    const profileKey = dbKeyPrefix + `pro:${id}`
+    const dbData: {[index:string]: string} = await rc.hGetAll(profileKey)
+    if (!dbData?.id) {
+        return undefined
+    }
+    return { ...dbData } as unknown as ProfileData
+}
+
+export async function saveProfileData(profileData: ProfileData) {
+    const rc = await getDb()
+    const profileKey = dbKeyPrefix + `pro:${profileData.id}`
+    await rc.hSet(profileKey, { ...profileData })
 }

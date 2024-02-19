@@ -1,23 +1,32 @@
 {
   "targets": {
     "default": {
-      "source": "src/index1.html",
+      "source": [
+        "src/index1.html",
+        "src/index2.html"
+      ],
       "distDir": "../back-end/public/listen",
       "publicUrl": "/listen"
     }
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "rm -f ../back-end/public/listen/* && parcel build --no-cache --no-source-maps --no-optimize"
+    "build": "rm -f ../back-end/public/listen/* && parcel build --no-cache --no-source-maps",
+    "develop": "rm -f ../back-end/public/listen/* && parcel build --no-cache --no-optimize"
   },
   "dependencies": {
-    "@types/js-cookie": "^3.0.3",
+    "@emotion/react": "^11.11.3",
+    "@emotion/styled": "^11.11.0",
+    "@fontsource/roboto": "^5.0.8",
+    "@mui/icons-material": "^5.15.6",
+    "@mui/material": "^5.15.6",
     "ably": "^1.2.48",
     "js-cookie": "^3.0.5",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@types/js-cookie": "^3.0.6",
     "@types/react": "^18.2.21",
     "@types/react-dom": "^18.2.7",
     "buffer": "^6.0.3",

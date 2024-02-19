@@ -62,10 +62,10 @@ export async function sendSecretToClient(clientKey: string, force: boolean = fal
     }
     try {
         const response = await fetch(server + path, {
-            method: "POST",
-            mode: "same-origin",
-            cache: "no-cache",
-            credentials: "same-origin",
+            method: 'POST',
+            mode: 'same-origin',
+            cache: 'no-cache',
+            credentials: 'same-origin',
             headers: {
                 'authorization': `Bearer ${await createApnsJwt()}`,
                 'apns-id': clientData.pushId!,

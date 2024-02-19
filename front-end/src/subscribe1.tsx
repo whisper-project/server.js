@@ -212,7 +212,7 @@ function disconnect(messageType: string,
     console.log(`Disconnecting due to message of type: ${messageType}`)
     setConnection("disconnected")
     updateWhisperer(`Disconnected from ${publisherName}`)
-    channel.detach()
+    channel.detach().then()
 }
 
 function readLiveText(channel: Ably.Types.RealtimeChannelPromise) {
@@ -223,7 +223,7 @@ function readLiveText(channel: Ably.Types.RealtimeChannelPromise) {
     console.log("Requesting resend of live text...")
     resetInProgress = true
     // request the whisperer to send all the text
-    channel.publish(publisherId, "-20|live")
+    channel.publish(publisherId, "-20|live").then()
 }
 
 function processChunk(chunk: string,

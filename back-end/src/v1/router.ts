@@ -4,8 +4,9 @@
 
 import express from 'express'
 
-import {apnsReceivedNotification, apnsToken, pubSubTokenRequest, subscribeTokenRequest,} from './routes.js';
+import {pubSubTokenRequest, subscribeTokenRequest,} from './routes.js';
 import {asyncWrapper, sessionMiddleware} from '../middleware.js'
+import {apnsReceivedNotification, apnsToken} from '../routes.js'
 
 export const v1router = express.Router()
 

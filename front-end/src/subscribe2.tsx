@@ -2,7 +2,7 @@
 // Licensed under the GNU Affero General Public License v3.
 // See the LICENSE file for details.
 
-import React, {useEffect, useState} from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Cookies from 'js-cookie'
 import { AblyProvider, useChannel, usePresence } from 'ably/react'
 import * as Ably from 'ably'
@@ -207,22 +207,32 @@ function LivePastText(props: { text: Text }) {
     }
     const disableCopy = (e: React.ClipboardEvent<HTMLInputElement>) => preventDefault(e,'Copy blocked')
     const disableCut = (e: React.ClipboardEvent<HTMLInputElement>) => preventDefault(e, 'Cut blocked')
+    const pastTextBox = useRef(null)
+    useLayoutEffect(() => {
+        if (pastTextBox.current !== null) {
+            const element = pastTextBox.current as unknown as HTMLInputElement
+            const textArea = element.children[1].children[0]
+            textArea.scrollTop = textArea.scrollHeight
+        }
+    })
     return (
         <>
             <TextField
                 multiline
-                label={`Live Typing`}
-                minRows={2}
-                value={props.text.live || ' '}
+                ref={pastTextBox}
+                label={`Past Typing`}
+                id="pastText"
+                minRows={5}
+                maxRows={12}
+                value={props.text.past || ' '}
                 onCopy={disableCopy}
                 onCut={disableCut}
             />
             <TextField
                 multiline
-                label={`Past Typing`}
-                id="pastText"
-                minRows={15}
-                value={props.text.past || ' '}
+                label={`Live Typing`}
+                minRows={2}
+                value={props.text.live || ' '}
                 onCopy={disableCopy}
                 onCut={disableCut}
             />
@@ -319,9 +329,9 @@ function receiveContentChunk(message: Ably.Types.Message,
                 return { live: chunk.text, past: text.past }
             })
         } else if (chunk.offset === 'newline') {
-            console.log("Prepending live text to past line")
+            console.log("Appending live text to past text")
             updateText((text: Text) => {
-                return { live: '', past: text.live + '\n' + text.past }
+                return { live: '', past: text.past + '\n' + text.live }
             })
         } else {
             const offset = chunk.offset as number

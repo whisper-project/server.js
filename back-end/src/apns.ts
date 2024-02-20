@@ -37,14 +37,14 @@ export async function setApnsRequestData(requestKey: string, data: ApnsRequestDa
     await rc.hSet(dbKeyPrefix + requestKey, update)
 }
 
-export async function sendSecretToClient(clientKey: string, force: boolean = false) {
+export async function sendSecretToClient(clientId: string, force: boolean = false) {
     const config = getSettings()
-    const { didRefresh, clientData } = await refreshSecret(clientKey, force)
+    const { didRefresh, clientData } = await refreshSecret(clientId, force)
     if (!didRefresh) {
-        console.log(`Client ${clientKey} already has its secret`)
+        console.log(`Client ${clientId} already has its secret`)
         return true
     }
-    console.log(`Pushing secret to client ${clientKey}`)
+    console.log(`Pushing secret to client ${clientId}`)
     const server = config.apnsUrl
     const path = `/3/device/${clientData.token}`
     const secret64 = Buffer.from(clientData.secret!, 'hex').toString('base64')
@@ -57,7 +57,7 @@ export async function sendSecretToClient(clientKey: string, force: boolean = fal
     const requestKey = `req:${clientData.pushId!}`
     const requestData: ApnsRequestData = {
         id: clientData.pushId!,
-        clientKey,
+        clientKey: clientId,
         status: -1,
     }
     try {

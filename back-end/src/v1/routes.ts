@@ -3,12 +3,12 @@
 // See the LICENSE file for details.
 
 import express from 'express'
-import {randomUUID} from 'crypto'
+import { randomUUID } from 'crypto'
 
-import {createAblyPublishTokenRequest, createAblySubscribeTokenRequest} from './auth.js'
-import {subscribe_response} from './templates.js'
-import {ClientData, getClientData, setClientData} from '../client.js'
-import {validateClientJwt} from '../auth.js'
+import { createAblyPublishTokenRequest, createAblySubscribeTokenRequest } from './auth.js'
+import { subscribe_response } from './templates.js'
+import { ClientData, getClientData, setClientData } from '../client.js'
+import { validateClientAuth } from '../auth.js'
 
 export async function pubSubTokenRequest(req: express.Request, res: express.Response) {
     const body: { [p: string]: string } = req.body
@@ -18,52 +18,36 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
         return
     }
     const { clientId, activity, publisherId } = body
-    const clientKey = `cli:${clientId}`
-    console.log(`Token request received from client ${clientKey}`)
-    const auth = req.header('Authorization')
-    if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
-        console.log(`Missing or invalid authorization header: ${auth}`)
-        res.status(403).send({ status: 'error', reason: 'Invalid authorization header' })
-        return
-    }
-    if (!await validateClientJwt(auth.substring(7), clientKey)) {
-        console.log(`Client JWT failed to validate`)
-        res.status(403).send({ status: 'error', reason: 'Invalid authorization' })
-        return
-    }
-    if (activity !== 'publish' && activity !== 'subscribe') {
-        console.log(`Publishing and subscribing are the only allowed activities: ${JSON.stringify(body)}`)
-        res.status(400).send({ status: 'error', reason: 'Invalid activity' });
-        return
-    }
-    if (clientId === publisherId && activity === 'subscribe') {
-        console.log(`Self-publishing is not allowed: ${JSON.stringify(body)}`)
-        res.status(400).send({ status: 'error', reason: 'Self-publishing is not allowed' });
-        return
-    }
-    if (clientId !== publisherId && activity !== 'subscribe') {
-        console.log(`Publishing as someone else is not allowed: ${JSON.stringify(body)}`)
-        res.status(400).send({ status: 'error', reason: 'Impersonation is not allowed' });
-        return
-    }
-    const existing = await getClientData(clientKey)
+    console.log(`Token request received from client ${clientId}`)
+    if (!await validateClientAuth(req, res, clientId)) return
+    const existing = await getClientData(clientId)
     if (body?.userName && body.userName !== existing?.userName) {
-        if (activity === 'publish') {
-            console.log(`Updating whisperer name from request`)
-        } else {
-            console.log(`Updating listener name from request`)
-        }
+        console.log(`Updating username from request`)
         const update: ClientData = { id: clientId, userName: body?.userName }
-        await setClientData(clientKey, update)
+        await setClientData(update)
     }
-    if (activity === 'publish') {
+    if (activity.toLowerCase() == 'publish') {
+        if (clientId !== publisherId) {
+            console.log(`Publishing as someone else is not allowed: ${JSON.stringify(body)}`)
+            res.status(400).send({ status: 'error', reason: 'Impersonation is not allowed' });
+            return
+        }
         const tokenRequest = await createAblyPublishTokenRequest(clientId)
-        console.log(`Issued publish token request to client ${clientKey}`)
+        console.log(`Issued publish token request to client ${clientId}`)
+        res.status(200).send({ status: 'success', tokenRequest: JSON.stringify(tokenRequest)})
+    } else if (activity.toLowerCase() == 'subscribe') {
+        if (clientId === publisherId) {
+            console.log(`Self-publishing is not allowed: ${JSON.stringify(body)}`)
+            res.status(400).send({ status: 'error', reason: 'Self-publishing is not allowed' });
+            return
+        }
+        const tokenRequest = await createAblySubscribeTokenRequest(clientId, publisherId)
+        console.log(`Issued subscribe token request to client ${clientId}`)
         res.status(200).send({ status: 'success', tokenRequest: JSON.stringify(tokenRequest)})
     } else {
-        const tokenRequest = await createAblySubscribeTokenRequest(clientId, publisherId)
-        console.log(`Issued subscribe token request to client ${clientKey}`)
-        res.status(200).send({ status: 'success', tokenRequest: JSON.stringify(tokenRequest)})
+        console.log(`Publish and Subscribe are the only allowed activities: ${JSON.stringify(body)}`)
+        res.status(400).send({ status: 'error', reason: 'Invalid activity' });
+        return
     }
 }
 
@@ -88,7 +72,9 @@ export async function subscribeToPublisher(req: express.Request, res: express.Re
     let clientId = req?.session?.clientId
     if (!clientId) {
         clientId = randomUUID().toUpperCase()
+        console.log(`Making new web client: ${clientId}`)
     }
+    console.log(`Issuing listen page for publisher ${publisherId} to client ${clientId}`)
     req.session = { clientId, publisherId }
     setCookie('publisherId', publisherId)
     setCookie('publisherName', publisherName)
@@ -102,9 +88,11 @@ export async function subscribeTokenRequest(req: express.Request, res: express.R
     const clientId = req?.session?.clientId
     const publisherId = req?.session?.publisherId
     if (!clientId || !publisherId) {
+        console.error(`Failing subscribe token request with no session information from web client ${clientId}`)
         res.status(403).send({ status: 'error', reason: 'no session to support authentication' })
         return
     }
+    console.log(`Issuing subscribe token to web client ${clientId}`)
     const tokenRequest = await createAblySubscribeTokenRequest(clientId, publisherId)
     res.status(200).send(tokenRequest)
 }

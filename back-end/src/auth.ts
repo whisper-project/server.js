@@ -7,6 +7,7 @@ import {randomBytes, randomUUID} from 'crypto';
 
 import {ClientData, getClientData, setClientData} from './client.js'
 import {getSettings} from './settings.js'
+import express from 'express'
 
 export async function createApnsJwt() {
     const alg = 'ES256'
@@ -34,6 +35,36 @@ export async function validateApnsJwt(jwt: string) {
         }
         throw err
     }
+}
+
+export async function validateClientAuth(req: express.Request, res: express.Response, clientId: string) {
+    const auth = req.header('Authorization')
+    if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
+        console.log(`Missing or invalid authorization header: ${auth}`)
+        res.status(403).send({ status: 'error', reason: 'Invalid authorization header' })
+        return false
+    }
+    if (!await validateClientJwt(auth.substring(7), clientId)) {
+        console.log(`Client JWT failed to validate`)
+        res.status(403).send({ status: 'error', reason: 'Invalid authorization' })
+        return false
+    }
+    return true
+}
+
+export async function validateProfileAuth(req: express.Request, res: express.Response, password: string) {
+    const auth = req.header('Authorization')
+    if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
+        console.log(`Missing or invalid authorization header: ${auth}`)
+        res.status(403).send({ status: 'error', reason: 'Invalid authorization header' })
+        return false
+    }
+    if (auth.substring(7) != password) {
+        console.error(`User profile ${req.method} has incorrect password`)
+        res.status(403).send({status: `error`, reason: `Invalid authorization` })
+        return false
+    }
+    return true
 }
 
 export async function createClientJwt(clientKey: string) {
@@ -82,7 +113,7 @@ export interface RefreshSecretResponse {
     clientData: ClientData
 }
 
-export async function refreshSecret(clientKey: string, force: boolean = false) {
+export async function refreshSecret(clientId: string, force: boolean = false) {
     // Secrets rotate.  The client generates its first secret, and always
     // sets that as both the current and prior secret.  After that, every
     // time the server sends a new secret, the current secret rotates to
@@ -92,23 +123,23 @@ export async function refreshSecret(clientKey: string, force: boolean = false) {
     // and the server rotates the secret when that happens.  Clients sign auth requests
     // with the current secret, but the server allows use of the prior
     // secret as a one-time fallback when the client has gone out of sync.
-    const clientData = await getClientData(clientKey)
+    const clientData = await getClientData(clientId)
     if (!clientData || !clientData?.token || !clientData?.tokenDate) {
-        throw Error(`Can't have a secret without a dated device token: ${clientKey}`)
+        throw Error(`Can't have a secret without a dated device token: ${clientId}`)
     }
     if (force || !clientData?.secret || !clientData?.secretDate) {
         if (clientData?.secret && !clientData?.secretDate) {
             // a secret has been issued for this client, but it's never been received.
             // since these are often sent twice, it's important not to change it in case
             // there was simply a delay in responding to the notification.
-            console.log(`Reusing the sent-but-never-received secret for client ${clientKey}`)
+            console.log(`Reusing the sent-but-never-received secret for client ${clientId}`)
         } else {
-            console.log(`Issuing a new secret for client ${clientKey}`)
+            console.log(`Issuing a new secret for client ${clientId}`)
             clientData.secret = await makeNonce()
             clientData.secretDate = 0
         }
         clientData.pushId = randomUUID()
-        await setClientData(clientKey, clientData)
+        await setClientData(clientData)
         return { didRefresh: true, clientData } as RefreshSecretResponse
     }
     return { didRefresh: false, clientData } as RefreshSecretResponse

@@ -19,9 +19,10 @@ export interface ClientData {
     profileTimestamp?: number
 }
 
-export async function getClientData(clientKey: string) {
+export async function getClientData(id: string) {
     const rc = await getDb()
-    const existing: {[index:string]: string | number} = await rc.hGetAll(dbKeyPrefix + clientKey)
+    const clientKey = dbKeyPrefix + `cli:${id}`
+    const existing: {[index:string]: string | number} = await rc.hGetAll(clientKey)
     if (!existing?.id) {
         return undefined
     }
@@ -37,9 +38,10 @@ export async function getClientData(clientKey: string) {
     return existing as unknown as ClientData
 }
 
-export async function setClientData(clientKey: string, clientData: ClientData) {
+export async function setClientData(clientData: ClientData) {
     const rc = await getDb()
-    await rc.hSet(dbKeyPrefix + clientKey, { ...clientData })
+    const clientKey = dbKeyPrefix + `cli:${clientData.id}`
+    await rc.hSet(clientKey, { ...clientData })
 }
 
 export interface HasClientChanged {
@@ -47,8 +49,8 @@ export interface HasClientChanged {
     changeReason: string
 }
 
-export async function hasClientChanged(clientKey: string, received: ClientData) {
-    const existing = await getClientData(clientKey)
+export async function hasClientChanged(id: string, received: ClientData) {
+    const existing = await getClientData(id)
     // see refreshSecret for explanation of logic around lastSecret
     let clientChanged = false
     let changeReason = ""
@@ -69,30 +71,4 @@ export async function hasClientChanged(clientKey: string, received: ClientData) 
         changeReason = "new build data from existing"
     }
     return {clientChanged, changeReason} as HasClientChanged
-}
-
-export interface ProfileData {
-    id: string
-    name?: string
-    password?: string
-    whisperTimestamp?: string
-    whisperProfile?: string
-    listenTimestamp?: string
-    listenProfile?: string
-}
-
-export async function getProfileData(id: string) {
-    const rc = await getDb()
-    const profileKey = dbKeyPrefix + `pro:${id}`
-    const dbData: {[index:string]: string} = await rc.hGetAll(profileKey)
-    if (!dbData?.id) {
-        return undefined
-    }
-    return { ...dbData } as unknown as ProfileData
-}
-
-export async function saveProfileData(profileData: ProfileData) {
-    const rc = await getDb()
-    const profileKey = dbKeyPrefix + `pro:${profileData.id}`
-    await rc.hSet(profileKey, { ...profileData })
 }

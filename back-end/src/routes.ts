@@ -18,7 +18,6 @@ export async function apnsToken(req: express.Request, res: express.Response)  {
         return
     }
     const { token, clientId, lastSecret } = body
-    const clientKey = `cli:${clientId}`
     const tokenHex = Buffer.from(token, 'base64').toString('hex')
     const secretHex = Buffer.from(lastSecret, 'base64').toString('hex')
     const appInfo = body?.appInfo ? ` (${body.appInfo})` : ''
@@ -37,7 +36,7 @@ export async function apnsToken(req: express.Request, res: express.Response)  {
         if (recent.tokenDate! + 250 < received.tokenDate!) {
             recentlyReceived.splice(i, 1)
         } else if (recent.id === received.id && recent.token === received.token) {
-            console.warn(`Ignoring duplicate APNs post from ${clientKey}${appInfo}`)
+            console.warn(`Ignoring duplicate APNs post from ${clientId}${appInfo}`)
             res.setHeader('X-Received-Earlier', recent.tokenDate!.toString())
             res.status(204).send()
             return
@@ -46,16 +45,16 @@ export async function apnsToken(req: express.Request, res: express.Response)  {
         }
     }
     recentlyReceived.push(received)
-    const {clientChanged, changeReason} = await hasClientChanged(clientKey, received)
+    const {clientChanged, changeReason} = await hasClientChanged(clientId, received)
     await incrementErrorCounts(body)
     if (clientChanged) {
-        console.log(`Received ${changeReason} client ${clientKey}${appInfo}`)
-        await setClientData(clientKey, received)
+        console.log(`Received ${changeReason} client ${clientId}${appInfo}`)
+        await setClientData(received)
     } else {
-        console.log(`Received APNS token from unchanged client ${clientKey}${appInfo}`)
+        console.log(`Received APNS token from unchanged client ${clientId}${appInfo}`)
     }
     res.status(204).send()
-    await sendSecretToClient(clientKey, clientChanged)
+    await sendSecretToClient(clientId, clientChanged)
 }
 
 export async function apnsReceivedNotification(req: express.Request, res: express.Response) {
@@ -66,11 +65,10 @@ export async function apnsReceivedNotification(req: express.Request, res: expres
         return
     }
     const {clientId, lastSecret} = body
-    const clientKey = `cli:${clientId}`
+    console.log(`Received confirmation of received notification from client ${clientId}`)
     const secretHex = Buffer.from(lastSecret, 'base64').toString('hex')
     // see refreshSecret for details of this logic
     const received: ClientData = {id: clientId, secretDate: Date.now(), lastSecret: secretHex}
-    await setClientData(clientKey, received)
-    console.log(`Received confirmation of received notification from client ${clientKey}`)
+    await setClientData(received)
     res.status(204).send()
 }

@@ -102,13 +102,13 @@ export async function userProfilePost(req: express.Request, res: express.Respons
     const clientId = req.header('X-Client-Id') || 'unknown-client'
     const body: { [p: string]: string } = req.body
     if (!body.id || !body.name || !body.password) {
-        console.log(`User profile POST is missing data`)
+        console.log(`User profile POST from client ${clientId} is missing data`)
         res.status(400).send({ status: `error`, reason: `Invalid POST data` });
         return
     }
     const existingData = await getProfileData(body.id)
     if (existingData?.name) {
-        console.error(`User profile POST for ${body.id} but the profile exists`)
+        console.error(`User profile POST for ${body.id} from client ${clientId} but the profile exists`)
         res.status(409).send({status: `error`, reason: `Profile ${body.id} already exists`})
         return
     }
@@ -127,13 +127,13 @@ export async function userProfilePut(req: express.Request, res: express.Response
     const body: { [p: string]: string } = req.body
     const profileId = req.params?.profileId
     if (!profileId || !body?.name) {
-        console.log(`User profile PUT is missing data`)
+        console.log(`User profile PUT from client ${clientId} is missing data`)
         res.status(400).send({ status: `error`, reason: `Invalid PUT data` });
         return
     }
     const existingData = await getProfileData(profileId)
     if (!existingData || !existingData.password) {
-        console.error(`User profile PUT for ${profileId} but the profile does not exist`)
+        console.error(`User profile PUT for ${profileId} from client ${clientId} but the profile does not exist`)
         res.status(404).send({status: `error`, reason: `Profile ${profileId} doesn't exist`})
         return
     }
@@ -148,20 +148,20 @@ export async function userProfileGet(req: express.Request, res: express.Response
     const clientId = req.header('X-Client-Id') || 'unknown-client'
     const profileId = req.params?.profileId
     if (!profileId) {
-        console.log(`No profile ID specified in GET`)
+        console.log(`No profile ID specified in GET from client ${clientId}`)
         res.status(404).send({ status: `error`, reason: `No such profile` });
         return
     }
     const existingData = await getProfileData(profileId)
     if (!existingData || !existingData?.name || !existingData?.password) {
-        console.error(`User profile GET for ${profileId} but the profile does not exist`)
+        console.error(`User profile GET from client ${clientId} for profile ${profileId} but it does not exist`)
         res.status(404).send({status: `error`, reason: `Profile ${profileId} doesn't exist`})
         return
     }
     if (!await validateProfileAuth(req, res, existingData.password)) return
     const precondition = req.header("If-None-Match")
     if (precondition && precondition === `"${existingData.name}"`) {
-        console.log(`User profile name matches client-submitted name, returning Precondition Failed`)
+        console.log(`User profile name matches name from client ${clientId}, returning Precondition Failed`)
         res.status(412).send({status: `error`, reason: `Server name matches client name`})
         return
     }
@@ -175,13 +175,13 @@ export async function whisperProfilePost(req: express.Request, res: express.Resp
     const clientId = req.header('X-Client-Id') || 'unknown-client'
     const body: { [p: string]: string } = req.body
     if (!body?.id || !body?.timestamp) {
-        console.log(`Whisper profile POST is missing data`)
+        console.log(`Whisper profile POST from client ${clientId} is missing data`)
         res.status(400).send({ status: `error`, reason: `Invalid POST data` });
         return
     }
     const existingData = await getProfileData(body.id)
     if (existingData?.whisperProfile) {
-        console.error(`Whisper profile POST for ${body.id} but the whisper profile exists`)
+        console.error(`Whisper profile POST for ${body.id} from client ${clientId} but the whisper profile exists`)
         res.status(409).send({status: `error`, reason: `Whisper profile ${body.id} already exists`})
         return
     }
@@ -199,24 +199,24 @@ export async function whisperProfilePut(req: express.Request, res: express.Respo
     const clientId = req.header('X-Client-Id') || 'unknown-client'
     const profileId = req.params?.profileId
     if (!profileId) {
-        console.log(`Whisper profile PUT is missing profile ID`)
+        console.log(`Whisper profile PUT from client ${clientId} is missing profile ID`)
         res.status(404).send({ status: `error`, reason: `Invalid Profile ID` });
         return
     }
     if (!req.body || !req.body?.timestamp) {
-        console.error(`Whisper profile PUT is missing a timestamp`)
+        console.error(`Whisper profile PUT from client ${clientId} is missing a timestamp`)
         res.status(400).send({ status: `error`, reason: `Missing timestamp`})
         return
     }
     const existingData = await getProfileData(profileId)
     if (!existingData?.password || !existingData?.whisperTimestamp || !existingData?.whisperProfile) {
-        console.error(`Whisper profile PUT for ${profileId} but the profile does not exist`)
+        console.error(`Whisper profile PUT for ${profileId} from client ${clientId} but the profile does not exist`)
         res.status(404).send({status: `error`, reason: `Whisper profile ${profileId} doesn't exist`})
         return
     }
     if (!await validateProfileAuth(req, res, existingData.password)) return
     if (existingData.whisperTimestamp > req.body.timestamp) {
-        console.error(`Post of whisper profile has older timestamp`)
+        console.error(`PUT of whisper profile from ${clientId} has older timestamp`)
         res.status(409).send({status: `error`, reason: `Newer whisper profile version on server`})
     }
     console.log(`Successful PUT of whisper profile ${existingData.id} from client ${clientId}`)
@@ -233,20 +233,20 @@ export async function whisperProfileGet(req: express.Request, res: express.Respo
     const clientId = req.header('X-Client-Id') || 'unknown-client'
     const profileId = req.params?.profileId
     if (!profileId) {
-        console.log(`No profile ID specified in GET`)
+        console.log(`No profile ID specified in GET from client ${clientId}`)
         res.status(404).send({ status: `error`, reason: `No such profile` });
         return
     }
     const existingData = await getProfileData(profileId)
     if (!existingData || !existingData?.password || !existingData.whisperTimestamp || !existingData.whisperProfile) {
-        console.error(`Whisper profile get for ${profileId} but the profile does not exist`)
+        console.error(`Whisper profile get for ${profileId} from client ${clientId} but the profile does not exist`)
         res.status(404).send({status: `error`, reason: `Whisper profile ${profileId} doesn't exist`})
         return
     }
     if (!await validateProfileAuth(req, res, existingData.password)) return
     const precondition = req.header("If-None-Match")
     if (precondition && precondition === `"${existingData.whisperTimestamp}"`) {
-        console.log(`Whisper profile timestamp matches client-submitted timestamp, returning Precondition Failed`)
+        console.log(`Whisper profile timestamp matches timestamp from client ${clientId}, returning Precondition Failed`)
         res.status(412).send({status: `error`, reason: `Server whisper timestamp matches client timestamp`})
         return
     }
@@ -260,13 +260,13 @@ export async function listenProfilePost(req: express.Request, res: express.Respo
     const clientId = req.header('X-Client-Id') || 'unknown-client'
     const body: { [p: string]: string } = req.body
     if (!body?.id || !body?.timestamp) {
-        console.log(`Listen profile POST is missing data`)
+        console.log(`Listen profile POST from client ${clientId} is missing data`)
         res.status(400).send({ status: `error`, reason: `Invalid POST data` });
         return
     }
     const existingData = await getProfileData(body.id)
     if (existingData?.listenProfile) {
-        console.error(`Listen profile POST for ${body.id} but the listen profile exists`)
+        console.error(`Listen profile POST for ${body.id} from ${clientId} but the listen profile exists`)
         res.status(409).send({status: `error`, reason: `Listen profile ${body.id} already exists`})
         return
     }
@@ -284,24 +284,24 @@ export async function listenProfilePut(req: express.Request, res: express.Respon
     const clientId = req.header('X-Client-Id') || 'unknown-client'
     const profileId = req.params?.profileId
     if (!profileId) {
-        console.log(`Listen profile PUT is missing profile ID`)
+        console.log(`Listen profile PUT from client ${clientId} is missing profile ID`)
         res.status(404).send({ status: `error`, reason: `Invalid Profile ID` });
         return
     }
     if (!req.body || !req.body?.timestamp) {
-        console.error(`Listen profile PUT is missing a timestamp`)
+        console.error(`Listen profile PUT from client ${clientId} is missing a timestamp`)
         res.status(400).send({ status: `error`, reason: `Missing timestamp`})
         return
     }
     const existingData = await getProfileData(profileId)
     if (!existingData?.password || !existingData?.listenTimestamp || !existingData?.listenProfile) {
-        console.error(`Listen profile PUT for ${profileId} but the profile does not exist`)
+        console.error(`Listen profile PUT for ${profileId} from client ${clientId} but the profile does not exist`)
         res.status(404).send({status: `error`, reason: `Listen profile ${profileId} doesn't exist`})
         return
     }
     if (!await validateProfileAuth(req, res, existingData.password)) return
     if (existingData.listenTimestamp > req.body.timestamp) {
-        console.error(`Post of listen profile has older timestamp`)
+        console.error(`Post of listen profile from client ${clientId} has older timestamp`)
         res.status(409).send({status: `error`, reason: `Newer listen profile version on server`})
     }
     console.log(`Successful PUT of listen profile ${existingData.id} from client ${clientId}`)
@@ -318,20 +318,20 @@ export async function listenProfileGet(req: express.Request, res: express.Respon
     const clientId = req.header('X-Client-Id') || 'unknown-client'
     const profileId = req.params?.profileId
     if (!profileId) {
-        console.log(`No profile ID specified in GET`)
+        console.log(`No profile ID specified in GET from client ${clientId}`)
         res.status(404).send({ status: `error`, reason: `No such profile` });
         return
     }
     const existingData = await getProfileData(profileId)
     if (!existingData || !existingData?.password || !existingData.listenTimestamp || !existingData.listenProfile) {
-        console.error(`Listen profile get for ${profileId} but the profile does not exist`)
+        console.error(`Listen profile get for ${profileId} from client ${clientId} but the profile does not exist`)
         res.status(404).send({status: `error`, reason: `Listen profile ${profileId} doesn't exist`})
         return
     }
     if (!await validateProfileAuth(req, res, existingData.password)) return
     const precondition = req.header("If-None-Match")
     if (precondition && precondition === `"${existingData.listenTimestamp}"`) {
-        console.log(`Listen profile timestamp matches client-submitted timestamp, returning Precondition Failed`)
+        console.log(`Listen profile timestamp matches timestamp from client ${clientId}, returning Precondition Failed`)
         res.status(412).send({status: `error`, reason: `Server listen timestamp matches client timestamp`})
         return
     }

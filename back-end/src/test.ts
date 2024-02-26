@@ -1,22 +1,22 @@
-// Copyright 2023 Daniel C. Brotsky. All rights reserved.
+// Copyright 2023-2024 Daniel C. Brotsky. All rights reserved.
 // Licensed under the GNU Affero General Public License v3.
 // See the LICENSE file for details.
 
-import {randomUUID} from 'crypto'
+import { randomUUID } from 'crypto'
 import assert from 'assert'
 import express from 'express'
-import {fetch} from 'fetch-h2'
+import { fetch } from 'fetch-h2'
 
-import {createApnsJwt, createClientJwt, makeNonce, validateApnsJwt, validateClientJwt} from "./auth.js";
-import {getDb} from './db.js'
-import {loadSettings} from './settings.js'
-import {ClientData, getClientData, setClientData} from './client.js'
-import {getApnsRequestData} from './apns.js'
-import {apnsToken} from './routes.js'
-import {asyncWrapper} from './middleware.js'
+import { createApnsJwt, createClientJwt, makeNonce, validateApnsJwt, validateClientJwt } from './auth.js'
+import { getDb } from './db.js'
+import { loadSettings } from './settings.js'
+import { ClientData, getClientData, setClientData } from './client.js'
+import { getApnsRequestData } from './apns.js'
+import { apnsToken } from './routes.js'
+import { asyncWrapper } from './middleware.js'
 
-import {testAll as test1} from './v1/test.js'
-import {testAll as test2} from './v2/test.js'
+import { testAll as test1 } from './v1/test.js'
+import { testAll as test2 } from './v2/test.js'
 
 export async function createTestClient() {
     const uuid = randomUUID()
@@ -62,7 +62,7 @@ async function testApns() {
         clientId: clientData.id,
         token: clientData.token,
         lastSecret: clientData.lastSecret,
-        appInfo: 'test-client'
+        appInfo: 'test-client',
     }
     const response1 = await fetch('http://localhost:2197/apns', { method: 'POST', json: body })
     const response2 = await fetch('http://localhost:2197/apns', { method: 'POST', json: body })
@@ -81,18 +81,18 @@ async function testApns() {
 
 async function mockApnsRoute(req: express.Request, res: express.Response) {
     const auth = req.header('authorization')
-    if (!auth || !auth.toLowerCase().startsWith("bearer ")) {
-        res.status(403).send({status: 'error', reason: 'Invalid authorization'})
+    if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
+        res.status(403).send({ status: 'error', reason: 'Invalid authorization' })
         return
     }
     const jwt = auth.substring(7)
     if (!await validateApnsJwt(jwt)) {
-        res.status(403).send({status: 'error', reason: 'Invalid jwt'})
+        res.status(403).send({ status: 'error', reason: 'Invalid jwt' })
         return
     }
     const apnsId = req.header('apns-id')
     if (!apnsId) {
-        res.status(400).send({status: 'error', reason: 'No apns-id header in request'})
+        res.status(400).send({ status: 'error', reason: 'No apns-id header in request' })
         return
     }
     res.setHeader('apns-id', apnsId)
@@ -130,7 +130,7 @@ async function testAll(...tests: string[]) {
 
 testAll(...process.argv.slice(2))
     .then(() => {
-        console.log("Tests completed with no errors")
+        console.log('Tests completed with no errors')
         process.exit(0)
     })
     .catch(reason => {

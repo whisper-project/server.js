@@ -1,11 +1,11 @@
-// Copyright 2023 Daniel C. Brotsky. All rights reserved.
+// Copyright 2023-2024 Daniel C. Brotsky. All rights reserved.
 // Licensed under the GNU Affero General Public License v3.
 // See the LICENSE file for details.
-import {getSettings} from '../settings.js'
+import { getSettings } from '../settings.js'
 import * as Ably from 'ably/promises.js'
 
 export async function createAblyPublishTokenRequest(
-    clientId: string, conversationId: string, contentId: string
+    clientId: string, conversationId: string, contentId: string,
 ) {
     const config = getSettings()
     const ably = new Ably.Rest({ key: config.ablyPublishKey })
@@ -14,7 +14,7 @@ export async function createAblyPublishTokenRequest(
     tokenCaps[`${conversationId}:${contentId}`] = ['publish']
     const tokenParams = {
         clientId,
-        capability: JSON.stringify(tokenCaps)
+        capability: JSON.stringify(tokenCaps),
     }
     return await ably.auth.createTokenRequest(tokenParams)
 }
@@ -27,7 +27,7 @@ export async function createAblySubscribeTokenRequest(clientId: string, conversa
     tokenCaps[`${conversationId}:*`] = ['subscribe']
     const tokenParams = {
         clientId,
-        capability: JSON.stringify(tokenCaps)
+        capability: JSON.stringify(tokenCaps),
     }
     return await ably.auth.createTokenRequest(tokenParams)
 }

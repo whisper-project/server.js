@@ -1,8 +1,8 @@
-// Copyright 2023 Daniel C. Brotsky. All rights reserved.
+// Copyright 2023-2024 Daniel C. Brotsky. All rights reserved.
 // Licensed under the GNU Affero General Public License v3.
 // See the LICENSE file for details.
 
-import {dbKeyPrefix, getDb} from './db.js'
+import { dbKeyPrefix, getDb } from './db.js'
 
 export interface ClientData {
     id: string,
@@ -14,26 +14,26 @@ export interface ClientData {
     secretDate?: number,
     pushId?: string,
     appInfo?: string,
-    userName?: string,      // used in v1
+    userName?: string,      // used in v1 & v2
     profileId?: string,     // used in v2
-    profileTimestamp?: number
+    lastLaunch?: number,
 }
 
 export async function getClientData(id: string) {
     const rc = await getDb()
     const clientKey = dbKeyPrefix + `cli:${id}`
-    const existing: {[index:string]: string | number} = await rc.hGetAll(clientKey)
+    const existing: { [index: string]: string | number } = await rc.hGetAll(clientKey)
     if (!existing?.id) {
         return undefined
     }
-    if (typeof existing?.tokenDate === "string") {
+    if (typeof existing?.tokenDate === 'string') {
         existing.tokenDate = parseInt(existing.tokenDate)
     }
-    if (typeof existing?.secretDate === "string") {
+    if (typeof existing?.secretDate === 'string') {
         existing.secretDate = parseInt(existing.secretDate)
     }
-    if (typeof existing?.profileTimestamp === 'string') {
-        existing.profileTimestamp = parseInt(existing.profileTimestamp)
+    if (typeof existing?.lastLaunch === 'string') {
+        existing.lastLaunch = parseInt(existing.lastLaunch)
     }
     return existing as unknown as ClientData
 }
@@ -53,22 +53,22 @@ export async function hasClientChanged(id: string, received: ClientData) {
     const existing = await getClientData(id)
     // see refreshSecret for explanation of logic around lastSecret
     let clientChanged = false
-    let changeReason = ""
+    let changeReason = ''
     if (!existing) {
         clientChanged = true
-        changeReason = "APNS token from new"
+        changeReason = 'APNS token from new'
     }
     if (!clientChanged && received.lastSecret !== existing?.lastSecret) {
         clientChanged = true
-        changeReason = "unconfirmed secret from existing"
+        changeReason = 'unconfirmed secret from existing'
     }
     if (!clientChanged && received.token !== existing?.token) {
         clientChanged = true
-        changeReason = "new APNS token from existing"
+        changeReason = 'new APNS token from existing'
     }
     if (!clientChanged && received.appInfo !== existing?.appInfo) {
         clientChanged = true
-        changeReason = "new build data from existing"
+        changeReason = 'new build data from existing'
     }
-    return {clientChanged, changeReason} as HasClientChanged
+    return { clientChanged, changeReason } as HasClientChanged
 }

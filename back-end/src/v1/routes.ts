@@ -1,4 +1,4 @@
-// Copyright 2023 Daniel C. Brotsky. All rights reserved.
+// Copyright 2023-2024 Daniel C. Brotsky. All rights reserved.
 // Licensed under the GNU Affero General Public License v3.
 // See the LICENSE file for details.
 
@@ -14,7 +14,7 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
     const body: { [p: string]: string } = req.body
     if (!body?.clientId || !body?.activity || !body?.publisherId) {
         console.log(`Missing key in pub-sub token request body: ${JSON.stringify(body)}`)
-        res.status(400).send({ status: 'error', reason: 'Invalid post data' });
+        res.status(400).send({ status: 'error', reason: 'Invalid post data' })
         return
     }
     const { clientId, activity, publisherId } = body
@@ -29,24 +29,24 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
     if (activity.toLowerCase() == 'publish') {
         if (clientId !== publisherId) {
             console.log(`Publishing as someone else is not allowed: ${JSON.stringify(body)}`)
-            res.status(400).send({ status: 'error', reason: 'Impersonation is not allowed' });
+            res.status(400).send({ status: 'error', reason: 'Impersonation is not allowed' })
             return
         }
         const tokenRequest = await createAblyPublishTokenRequest(clientId)
         console.log(`Issued publish token request to client ${clientId}`)
-        res.status(200).send({ status: 'success', tokenRequest: JSON.stringify(tokenRequest)})
+        res.status(200).send({ status: 'success', tokenRequest: JSON.stringify(tokenRequest) })
     } else if (activity.toLowerCase() == 'subscribe') {
         if (clientId === publisherId) {
             console.log(`Self-publishing is not allowed: ${JSON.stringify(body)}`)
-            res.status(400).send({ status: 'error', reason: 'Self-publishing is not allowed' });
+            res.status(400).send({ status: 'error', reason: 'Self-publishing is not allowed' })
             return
         }
         const tokenRequest = await createAblySubscribeTokenRequest(clientId, publisherId)
         console.log(`Issued subscribe token request to client ${clientId}`)
-        res.status(200).send({ status: 'success', tokenRequest: JSON.stringify(tokenRequest)})
+        res.status(200).send({ status: 'success', tokenRequest: JSON.stringify(tokenRequest) })
     } else {
         console.log(`Publish and Subscribe are the only allowed activities: ${JSON.stringify(body)}`)
-        res.status(400).send({ status: 'error', reason: 'Invalid activity' });
+        res.status(400).send({ status: 'error', reason: 'Invalid activity' })
         return
     }
 }
@@ -55,6 +55,7 @@ export async function subscribeToPublisher(req: express.Request, res: express.Re
     function setCookie(name: string, value: string) {
         res.cookie(name, value, { maxAge: 365 * 24 * 60 * 60 * 1000, httpOnly: false })
     }
+
     const publisherId = req.params?.publisherId
     if (!publisherId || publisherId.match(/^[-0-9a-zA-Z]{36}$/) === null) {
         res.setHeader('Location', '/subscribe404.html')

@@ -1,20 +1,21 @@
-// Copyright 2023 Daniel C. Brotsky. All rights reserved.
+// Copyright 2023-2024 Daniel C. Brotsky. All rights reserved.
 // Licensed under the GNU Affero General Public License v3.
 // See the LICENSE file for details.
 
 import express from 'express'
 
-import {sendSecretToClient} from './apns.js'
-import {ClientData, hasClientChanged, setClientData} from './client.js'
-import {incrementErrorCounts} from './db.js'
+import { sendSecretToClient } from './apns.js'
+import { ClientData, hasClientChanged, setClientData } from './client.js'
+import { incrementErrorCounts } from './db.js'
+import { updateLaunchData } from './profile.js'
 
 const recentlyReceived: ClientData[] = []
 
-export async function apnsToken(req: express.Request, res: express.Response)  {
+export async function apnsToken(req: express.Request, res: express.Response) {
     const body: { [p: string]: string } = req.body
     if (!body?.token || !body?.clientId || !body?.lastSecret) {
         console.log(`Missing key in posted apnsToken body: ${JSON.stringify(body)}`)
-        res.status(400).send({ status: 'error', reason: 'Invalid post data' });
+        res.status(400).send({ status: 'error', reason: 'Invalid post data' })
         return
     }
     const { token, clientId, lastSecret } = body
@@ -27,11 +28,13 @@ export async function apnsToken(req: express.Request, res: express.Response)  {
         tokenDate: Date.now(),
         lastSecret: secretHex,
         userName: body?.userName || '',
+        profileId: body?.profileId || '',
         appInfo: body?.appInfo || '',
+        lastLaunch: Date.now(),
     }
     // we need to ignore duplicate, almost-simultaneous posts from the same client
     // see issue #2 for details of the problem
-    for (let i = 0; i < recentlyReceived.length; ) {
+    for (let i = 0; i < recentlyReceived.length;) {
         const recent = recentlyReceived[i]
         if (recent.tokenDate! + 250 < received.tokenDate!) {
             recentlyReceived.splice(i, 1)
@@ -45,11 +48,14 @@ export async function apnsToken(req: express.Request, res: express.Response)  {
         }
     }
     recentlyReceived.push(received)
-    const {clientChanged, changeReason} = await hasClientChanged(clientId, received)
+    if (received.userName && received.profileId) {
+        await updateLaunchData(received.id, received.profileId, received.userName)
+    }
+    const { clientChanged, changeReason } = await hasClientChanged(clientId, received)
+    await setClientData(received)
     await incrementErrorCounts(body)
     if (clientChanged) {
         console.log(`Received ${changeReason} client ${clientId}${appInfo}`)
-        await setClientData(received)
     } else {
         console.log(`Received APNS token from unchanged client ${clientId}${appInfo}`)
     }
@@ -61,14 +67,14 @@ export async function apnsReceivedNotification(req: express.Request, res: expres
     const body: { [p: string]: string } = req.body
     if (!body?.clientId || !body?.lastSecret) {
         console.log(`Missing key in received notification post: ${JSON.stringify(body)}`)
-        res.status(400).send({status: 'error', reason: 'Invalid post data'});
+        res.status(400).send({ status: 'error', reason: 'Invalid post data' })
         return
     }
-    const {clientId, lastSecret} = body
+    const { clientId, lastSecret } = body
     console.log(`Received confirmation of received notification from client ${clientId}`)
     const secretHex = Buffer.from(lastSecret, 'base64').toString('hex')
     // see refreshSecret for details of this logic
-    const received: ClientData = {id: clientId, secretDate: Date.now(), lastSecret: secretHex}
+    const received: ClientData = { id: clientId, secretDate: Date.now(), lastSecret: secretHex }
     await setClientData(received)
     res.status(204).send()
 }

@@ -1,12 +1,12 @@
-// Copyright 2023 Daniel C. Brotsky. All rights reserved.
+// Copyright 2023-2024 Daniel C. Brotsky. All rights reserved.
 // Licensed under the GNU Affero General Public License v3.
 // See the LICENSE file for details.
 
 import * as jose from 'jose'
-import {randomBytes, randomUUID} from 'crypto';
+import { randomBytes, randomUUID } from 'crypto'
 
-import {ClientData, getClientData, setClientData} from './client.js'
-import {getSettings} from './settings.js'
+import { ClientData, getClientData, setClientData } from './client.js'
+import { getSettings } from './settings.js'
 import express from 'express'
 
 export async function createApnsJwt() {
@@ -27,8 +27,7 @@ export async function validateApnsJwt(jwt: string) {
     try {
         await jose.jwtVerify(jwt, privateKey)
         return true
-    }
-    catch (err) {
+    } catch (err) {
         if (err instanceof jose.errors.JWSSignatureVerificationFailed) {
             console.log(`Invalid APNS JWT: ${err}`)
             return false
@@ -61,7 +60,7 @@ export async function validateProfileAuth(req: express.Request, res: express.Res
     }
     if (auth.substring(7) != password) {
         console.error(`User profile ${req.method} has incorrect password`)
-        res.status(403).send({status: `error`, reason: `Invalid authorization` })
+        res.status(403).send({ status: `error`, reason: `Invalid authorization` })
         return false
     }
     return true
@@ -92,8 +91,7 @@ export async function validateClientJwt(jwt: string, clientKey: string) {
         try {
             await jose.jwtVerify(jwt, privateKey, { issuer: clientData.id })
             return true
-        }
-        catch (err) {
+        } catch (err) {
             if (err instanceof jose.errors.JWSSignatureVerificationFailed) {
                 if (secret === clientData.secret) {
                     console.log(`Validation of JWT with current secret failed: ${err}`)

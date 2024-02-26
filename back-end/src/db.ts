@@ -1,10 +1,10 @@
-// Copyright 2023 Daniel C. Brotsky. All rights reserved.
+// Copyright 2023-2024 Daniel C. Brotsky. All rights reserved.
 // Licensed under the GNU Affero General Public License v3.
 // See the LICENSE file for details.
 
-import {createClient, RedisClientType} from 'redis'
-import {getSettings} from './settings.js'
-import {makeNonce} from './auth.js'
+import { createClient, RedisClientType } from 'redis'
+import { getSettings } from './settings.js'
+import { makeNonce } from './auth.js'
 
 let loadedClient: RedisClientType | undefined
 export let dbKeyPrefix: string = 'u:'

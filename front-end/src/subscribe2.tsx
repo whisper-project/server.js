@@ -1,4 +1,4 @@
-// Copyright 2023 Daniel C. Brotsky. All rights reserved.
+// Copyright 2023-2024 Daniel C. Brotsky. All rights reserved.
 // Licensed under the GNU Affero General Public License v3.
 // See the LICENSE file for details.
 
@@ -23,9 +23,10 @@ const conversationName = Cookies.get('conversationName') || ''
 const whispererName = Cookies.get('whispererName') || ''
 const clientId = Cookies.get('clientId') || ''
 let clientName = Cookies.get('clientName') || ''
+const repeatControlChannelPackets = Cookies.get('repeatControlChannelPackets') || ''
 
 if (!conversationId || !whispererName || !clientId || !conversationName) {
-    window.location.href = "/subscribe404.html"
+    window.location.href = '/subscribe404.html'
 }
 
 const client = new Ably.Realtime.Promise({
@@ -45,7 +46,7 @@ export default function ListenerView() {
     if (!listenerName) {
         return <NameView confirm={(msg) => setListenerName(msg)} />
     } else if (exitMsg) {
-        return <DisconnectedView message={exitMsg}/>
+        return <DisconnectedView message={exitMsg} />
     } else {
         return (
             <AblyProvider client={client}>
@@ -55,7 +56,7 @@ export default function ListenerView() {
     }
 }
 
-function NameView(props: { confirm: (msg: string) => void} ) {
+function NameView(props: { confirm: (msg: string) => void }) {
     const [name, setName] = useState(clientName)
 
     function onChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -79,7 +80,7 @@ function NameView(props: { confirm: (msg: string) => void} ) {
                 with the user “{whispererName}”.
                 The name you enter here will be
                 revealed to that person, and what they type will
-                appear for you to see.  If you don't wish
+                appear for you to see. If you don't wish
                 to participate in this conversation, just close this window.
             </Typography>
             <Typography variant="h5" gutterBottom>
@@ -107,7 +108,7 @@ function NameView(props: { confirm: (msg: string) => void} ) {
 }
 
 function DisconnectedView(props: { message: string }) {
-    console.log("Waiting a second to drain messages, then closing client")
+    console.log('Waiting a second to drain messages, then closing client')
     setTimeout(() => client.close(), 1000)
     return (
         <Stack spacing={5}>
@@ -138,9 +139,9 @@ function ConnectView(props: { exit: (msg: string) => void }) {
     return (
         <Stack spacing={5}>
             <Typography variant="h4">Conversation “{conversationName}” with {whispererName}</Typography>
-            <StatusView status={status} exit={exit}/>
+            <StatusView status={status} exit={exit} />
             {status.match(/^[A-Za-z0-9-]{36}$/) &&
-                <ConversationView contentId={status} reread={rereadLiveText}/>
+                <ConversationView contentId={status} reread={rereadLiveText} />
             }
         </Stack>
     )
@@ -158,12 +159,12 @@ function StatusView(props: { status: string, exit: (msg: string) => void }) {
             break
         default:
             if (props.status.match(/^[A-Za-z0-9-]{36}$/)) {
-                message = "Connected and listening..."
+                message = 'Connected and listening...'
             } else {
                 message = `Something has gone wrong (invalid status ${props.status}).`
                 setTimeout(
                     () => props.exit(`A connection error occurred.  Please try refreshing this window.`),
-                    250
+                    250,
                 )
             }
     }
@@ -189,10 +190,10 @@ function StatusView(props: { status: string, exit: (msg: string) => void }) {
 }
 
 function ConversationView(props: { contentId: string, reread: () => void }) {
-    const [text, updateText] = useState({live: '', past: ''} as Text)
+    const [text, updateText] = useState({ live: '', past: '' } as Text)
     useChannel(
         `${conversationId}:${props.contentId}`,
-        (m) => receiveContentChunk(m, updateText, props.reread)
+        (m) => receiveContentChunk(m, updateText, props.reread),
     )
     doCount(props.reread, 'initialRead', 1)
     return (
@@ -205,7 +206,7 @@ function LivePastText(props: { text: Text }) {
         console.log(message)
         event.preventDefault()
     }
-    const disableCopy = (e: React.ClipboardEvent<HTMLInputElement>) => preventDefault(e,'Copy blocked')
+    const disableCopy = (e: React.ClipboardEvent<HTMLInputElement>) => preventDefault(e, 'Copy blocked')
     const disableCut = (e: React.ClipboardEvent<HTMLInputElement>) => preventDefault(e, 'Cut blocked')
     const pastTextBox = useRef(null)
     useLayoutEffect(() => {
@@ -240,13 +241,49 @@ function LivePastText(props: { text: Text }) {
     )
 }
 
+const controlQueue: { id: string, chunk: string }[] = []
+let lastControlOffset: string = ''
+
+function sendControlChunk(channel: Ably.Types.RealtimeChannelPromise, id: string, chunk: string) {
+    if (controlQueue.length == 0) {
+        console.debug(`Sending control chunk: ${chunk}`)
+        channel.publish(id, chunk).then()
+        if (repeatControlChannelPackets) {
+            let current = { id, chunk }
+            controlQueue.push(current)
+            let count = 1
+
+            function resend() {
+                if (count >= 3) {
+                    controlQueue.shift()
+                    if (controlQueue.length > 0) {
+                        current = controlQueue[0]
+                        count = 0
+                        console.debug(`Sending queued control chunk: ${chunk}`)
+                    } else {
+                        return
+                    }
+                }
+                channel.publish(current.id, current.chunk).then()
+                count += 1
+                setTimeout(resend, 50)
+            }
+
+            setTimeout(resend, 50)
+        }
+    } else {
+        console.debug(`Queueing control chunk: ${chunk}`)
+        controlQueue.push({ id, chunk })
+    }
+}
+
 function receiveControlChunk(message: Ably.Types.Message,
                              channel: Ably.Types.RealtimeChannelPromise,
                              setStatus: React.Dispatch<React.SetStateAction<string>>,
                              exit: (msg: string) => void) {
     const me = clientId.toUpperCase()
     const topic = message.name.toUpperCase()
-    if (topic != me && topic != "ALL") {
+    if (topic != me && topic != 'ALL') {
         // ignoring message for another client
         return
     }
@@ -256,6 +293,12 @@ function receiveControlChunk(message: Ably.Types.Message,
         setStatus(`Ignoring an invalid packet; see log for details`)
         return
     }
+    if (info.offset == lastControlOffset) {
+        // every packet is sent three times, ignore all but the first
+        console.info(`Ignoring repeated control message: ${info.offset}`)
+        return
+    }
+    lastControlOffset = info.offset
     switch (info.offset) {
         case 'dropping':
             console.log(`Whisperer is dropping this client`)
@@ -267,7 +310,7 @@ function receiveControlChunk(message: Ably.Types.Message,
                 console.log(`Joining the conversation`)
                 const offset = controlOffsetValue('joining')
                 const chunk = `${offset}|${conversationId}|${info.conversationName}|${clientId}|${clientId}|${clientName}|`
-                channel.publish(info.clientId, chunk).then()
+                sendControlChunk(channel, info.clientId, chunk)
                 setStatus(info.contentId)
             } else {
                 console.error(`Invalid content id: ${info.contentId}.  Please report a bug!`)
@@ -278,7 +321,7 @@ function receiveControlChunk(message: Ably.Types.Message,
         case 'listenAuthNo':
             console.log(`Whisperer refused listener presence`)
             sendDrop(channel)
-            exit(`${whispererName} has refused to let you join this conversation`)
+            exit(`${whispererName} has refused to let you be in this conversation`)
             break
         case 'whisperOffer':
             console.log(`Received Whisper offer, sending request`)
@@ -286,7 +329,7 @@ function receiveControlChunk(message: Ably.Types.Message,
             console.log(`Received whisper offer from ${info.clientId}, sending listen request`)
             const offset = controlOffsetValue('listenRequest')
             const chunk = `${offset}|${conversationId}|${info.conversationName}|${clientId}|${clientId}|${clientName}|`
-            channel.publish(info.clientId, chunk).then()
+            sendControlChunk(channel, info.clientId, chunk)
     }
 }
 
@@ -297,7 +340,7 @@ function receiveContentChunk(message: Ably.Types.Message,
                              reread: () => void) {
     const me = clientId.toUpperCase()
     const topic = message.name.toUpperCase()
-    if (topic != me && topic != "ALL") {
+    if (topic != me && topic != 'ALL') {
         // ignoring message for another client
         return
     }
@@ -308,16 +351,16 @@ function receiveContentChunk(message: Ably.Types.Message,
     }
     if (resetInProgress) {
         if (chunk.offset === 'startReread') {
-            console.log("Received reset acknowledgement from whisperer, resetting live text")
+            console.log('Received reset acknowledgement from whisperer, resetting live text')
             updateText((text: Text) => {
                 return { live: '', past: text.past }
             })
         } else if (chunk.isDiff) {
-            console.log("Ignoring diff chunk because a read is in progress")
+            console.log('Ignoring diff chunk because a read is in progress')
         } else if (chunk.offset === 'pastText') {
-            console.log("Received unexpected past line chunk, ignoring it")
+            console.log('Received unexpected past line chunk, ignoring it')
         } else if (chunk.offset === 'liveText') {
-            console.log("Receive live text chunk, update is over")
+            console.log('Receive live text chunk, update is over')
             resetInProgress = false
             updateText((text: Text) => {
                 return { live: chunk.text, past: text.past }
@@ -329,7 +372,7 @@ function receiveContentChunk(message: Ably.Types.Message,
                 return { live: chunk.text, past: text.past }
             })
         } else if (chunk.offset === 'newline') {
-            console.log("Appending live text to past text")
+            console.log('Appending live text to past text')
             updateText((text: Text) => {
                 return { live: '', past: text.past + '\n' + text.live }
             })
@@ -366,29 +409,47 @@ interface ClientInfo {
 
 function parseControlOffset(offset: string): string | undefined {
     switch (offset) {
-        case '-20': return 'whisperOffer';
-        case '-21': return 'listenRequest';
-        case '-22': return 'listenAuthYes';
-        case '-23': return 'listenAuthNo';
-        case '-24': return 'joining';
-        case '-25': return 'dropping';
-        case '-26': return 'listenOffer';
-        case '-40': return 'requestReread'
-        default: return undefined
+        case '-20':
+            return 'whisperOffer'
+        case '-21':
+            return 'listenRequest'
+        case '-22':
+            return 'listenAuthYes'
+        case '-23':
+            return 'listenAuthNo'
+        case '-24':
+            return 'joining'
+        case '-25':
+            return 'dropping'
+        case '-26':
+            return 'listenOffer'
+        case '-40':
+            return 'requestReread'
+        default:
+            return undefined
     }
 }
 
 function controlOffsetValue(offset: string): string | undefined {
     switch (offset) {
-        case 'whisperOffer': return '-20'
-        case 'listenRequest': return '-21'
-        case 'listenAuthYes': return '-22'
-        case 'listenAuthNo': return '-23'
-        case 'joining': return '-24'
-        case 'dropping': return '-25'
-        case 'listenOffer': return '-26'
-        case 'requestReread': return '-40'
-        default: return undefined
+        case 'whisperOffer':
+            return '-20'
+        case 'listenRequest':
+            return '-21'
+        case 'listenAuthYes':
+            return '-22'
+        case 'listenAuthNo':
+            return '-23'
+        case 'joining':
+            return '-24'
+        case 'dropping':
+            return '-25'
+        case 'listenOffer':
+            return '-26'
+        case 'requestReread':
+            return '-40'
+        default:
+            return undefined
     }
 }
 
@@ -428,34 +489,42 @@ function parseContentChunk(chunk: String) {
     const parsed: ContentChunk = {
         isDiff: offsetNum >= -1,
         offset: parseContentOffset(offsetNum) || offsetNum,
-        text: parts[2] || ''
+        text: parts[2] || '',
     }
     return parsed
 }
 
 function parseContentOffset(offset: number) {
     switch (offset) {
-        case -1: return 'newline'
-        case -2: return 'pastText'
-        case -3: return 'liveText'
-        case -4: return 'startReread'
-        case -6: return 'clearHistory'
-        case -7: return 'playSound'
-        case -8: return 'playSpeech'
-        default: return undefined
+        case -1:
+            return 'newline'
+        case -2:
+            return 'pastText'
+        case -3:
+            return 'liveText'
+        case -4:
+            return 'startReread'
+        case -6:
+            return 'clearHistory'
+        case -7:
+            return 'playSound'
+        case -8:
+            return 'playSpeech'
+        default:
+            return undefined
     }
 }
 
 function sendDrop(channel: Ably.Types.RealtimeChannelPromise) {
     console.log(`Sending drop message`)
     let chunk = `${controlOffsetValue('dropping')}|||${clientId}|||`
-    channel.publish("whisperer", chunk).then()
+    channel.publish('whisperer', chunk).then()
 }
 
 function sendListenOffer(channel: Ably.Types.RealtimeChannelPromise) {
     console.log(`Sending listen offer`)
     let chunk = `${controlOffsetValue('listenOffer')}|${conversationId}||${clientId}|${clientId}||`
-    channel.publish("whisperer", chunk).then()
+    sendControlChunk(channel, 'whisperer', chunk)
 }
 
 function sendRereadText(channel: Ably.Types.RealtimeChannelPromise) {
@@ -463,25 +532,27 @@ function sendRereadText(channel: Ably.Types.RealtimeChannelPromise) {
         // already re-reading all the text
         return
     }
-    console.log("Requesting resend of live text...")
+    console.log('Requesting resend of live text...')
     resetInProgress = true
     // request the whisperer to send all the text
     let chunk = `${controlOffsetValue('requestReread')}|live`
-    channel.publish("whisperer", chunk).then()
+    sendControlChunk(channel, 'whisperer', chunk)
 }
 
 function hookUnload(fn: () => void) {
     useEffect(() => {
         const handleClose = () => {
-            console.log("Running beforeunload hook...")
+            console.log('Running beforeunload hook...')
             fn()
         }
         window.addEventListener('beforeunload', handleClose)
-        return () => { window.removeEventListener('beforeunload', handleClose)}
-    }, []);
+        return () => {
+            window.removeEventListener('beforeunload', handleClose)
+        }
+    }, [])
 }
 
-const doneCounts: {[p: string]: number} = { }
+const doneCounts: { [p: string]: number } = {}
 
 function doCount(fn: (() => void), which: string, max: number) {
     const doneCount = doneCounts[which] || 0

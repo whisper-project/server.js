@@ -1,16 +1,16 @@
-// Copyright 2023 Daniel C. Brotsky. All rights reserved.
+// Copyright 2023-2024 Daniel C. Brotsky. All rights reserved.
 // Licensed under the GNU Affero General Public License v3.
 // See the LICENSE file for details.
 
 import express from 'express'
 
-import {v1router} from './v1/router.js'
-import {v2router} from './v2/router.js'
-import {subscribeToPublisher} from './v1/routes.js';
-import {listenToConversation} from './v2/routes.js';
-import {asyncWrapper, cookieMiddleware, sessionMiddleware} from './middleware.js'
+import { v1router } from './v1/router.js'
+import { v2router } from './v2/router.js'
+import { subscribeToPublisher } from './v1/routes.js'
+import { listenToConversation } from './v2/routes.js'
+import { asyncWrapper, cookieMiddleware, sessionMiddleware } from './middleware.js'
 
-const PORT = process.env.PORT || 5001;
+const PORT = process.env.PORT || 5001
 
 express()
     .use(express.json())

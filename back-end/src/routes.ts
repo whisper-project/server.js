@@ -56,10 +56,11 @@ export async function apnsToken(req: express.Request, res: express.Response) {
     await incrementErrorCounts(body)
     if (clientChanged) {
         console.log(`Received ${changeReason} client ${clientId}${appInfo}`)
+        res.status(201).send()
     } else {
         console.log(`Received APNS token from unchanged client ${clientId}${appInfo}`)
+        res.status(204).send()
     }
-    res.status(204).send()
     await sendSecretToClient(clientId, clientChanged)
 }
 

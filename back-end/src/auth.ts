@@ -80,10 +80,10 @@ export async function createClientJwt(clientKey: string) {
         .sign(privateKey)
 }
 
-export async function validateClientJwt(jwt: string, clientKey: string) {
-    const clientData = await getClientData(clientKey)
+export async function validateClientJwt(jwt: string, clientId: string) {
+    const clientData = await getClientData(clientId)
     if (!clientData || !clientData?.id || !clientData?.secret || !clientData?.lastSecret) {
-        throw Error(`Can't validate a JWT for an invalid client ${clientKey}`)
+        throw Error(`Can't validate a JWT for an invalid client ${clientId}`)
     }
     // see refreshSecret for why we try this twice with different keys
     for (const secret of [clientData.secret, clientData.lastSecret]) {

@@ -1,4 +1,4 @@
-// Copyright 2023 Daniel C. Brotsky. All rights reserved.
+// Copyright 2023-2024 Daniel C. Brotsky. All rights reserved.
 // Licensed under the GNU Affero General Public License v3.
 // See the LICENSE file for details.
 
@@ -7,53 +7,76 @@ import { randomUUID } from 'crypto'
 
 import { createAblyPublishTokenRequest, createAblySubscribeTokenRequest } from './auth.js'
 import { subscribe_response } from './templates.js'
-import { validateClientJwt } from '../auth.js'
-import { ConversationInfo, getConversationInfo, setConversationInfo } from '../conversation.js'
-import { getProfileData, ProfileData, saveProfileData } from '../client.js'
+import { validateClientAuth, validateProfileAuth } from '../auth.js'
+import {
+    ConversationInfo,
+    getConversationInfo,
+    getProfileData,
+    ProfileData,
+    saveProfileData,
+    setConversationInfo,
+} from '../profile.js'
 
 export async function pubSubTokenRequest(req: express.Request, res: express.Response) {
     const body: { [p: string]: string } = req.body
-    if (!body?.clientId || !body?.activity || !body?.conversationId || !body?.conversationName ||
-        !body?.contentId || !body.profileId || !body.username) {
-        console.log(`Missing key in pub-sub token request body: ${JSON.stringify(body)}`)
-        res.status(400).send({ status: 'error', reason: 'Invalid POST data' });
+    if (!body?.clientId || !body?.activity || !body?.conversationId || !body.profileId) {
+        console.log(`Missing key in pub-sub token request body from ${body?.clientId}: ${JSON.stringify(body)}`)
+        res.status(400).send({ status: 'error', reason: 'Invalid pub-sub POST data' })
         return
     }
-    const { clientId, activity, conversationId, contentId } = body
-    const clientKey = `cli:${clientId}`
-    console.log(`Token v2 request received from client ${clientKey}`)
-    const auth = req.header('Authorization')
-    if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
-        console.log(`Missing or invalid authorization header: ${auth}`)
-        res.status(403).send({ status: 'error', reason: 'Invalid authorization header' })
-        return
-    }
-    if (!await validateClientJwt(auth.substring(7), clientKey)) {
-        console.log(`Client JWT failed to validate`)
-        res.status(403).send({ status: 'error', reason: 'Invalid authorization' })
-        return
-    }
-    if (activity !== 'publish' && activity !== 'subscribe') {
-        console.log(`Publishing and subscribing are the only allowed activities: ${JSON.stringify(body)}`)
-        res.status(400).send({ status: 'error', reason: 'Invalid activity' });
-        return
-    }
-    if (activity === 'publish') {
-        // save the conversation info for Web listeners:
-        const conversationKey = `con:${body.conversationId}`
-        const info: ConversationInfo = {
-            id: conversationId, name: body.conversationName, ownerId: body.profileId, ownerName: body.username
+    const { clientId, activity, conversationId } = body
+    console.log(`Token v2 request received from application client ${clientId}`)
+    if (!await validateClientAuth(req, res, clientId)) return
+    if (activity.toLowerCase() == 'publish') {
+        if (!body?.conversationName || !body?.contentId || !body?.username) {
+            console.log(`Missing key in publish token request body: ${JSON.stringify(body)}`)
+            res.status(400).send({ status: 'error', reason: 'Invalid publish POST data' })
+            return
         }
-        console.log(`Saving conversation data for listeners: ${JSON.stringify(info)}`)
-        await setConversationInfo(conversationKey, info)
-        // now issue the token
-        const tokenRequest = await createAblyPublishTokenRequest(clientId, conversationId, contentId)
-        console.log(`Issued publish token request to client ${clientKey}`)
-        res.status(200).send({ status: 'success', tokenRequest: JSON.stringify(tokenRequest)})
-    } else {
+        console.log(`Saving conversation data for conversation ${conversationId}`)
+        const info: ConversationInfo = {
+            id: conversationId, name: body.conversationName, ownerId: body.profileId,
+        }
+        await setConversationInfo(info)
+        const update: ProfileData = { id: body.profileId, name: body.username }
+        await saveProfileData(update)
+        console.log(`Issuing publish token request to Whisperer ${body.profileId}`)
+        const tokenRequest = await createAblyPublishTokenRequest(clientId, conversationId, body.contentId)
+        res.status(200).send({ status: 'success', tokenRequest: JSON.stringify(tokenRequest) })
+    } else if (activity.toLowerCase() == 'subscribe') {
+        console.log(`Issuing subscribe token request to Listener ${body.profileId}`)
         const tokenRequest = await createAblySubscribeTokenRequest(clientId, conversationId)
-        console.log(`Issued subscribe token request to client ${clientKey}`)
-        res.status(200).send({ status: 'success', tokenRequest: JSON.stringify(tokenRequest)})
+        res.status(200).send({ status: 'success', tokenRequest: JSON.stringify(tokenRequest) })
+    } else {
+        console.error(`Publish and Subscribe are the only allowed activities: ${JSON.stringify(body)}`)
+        res.status(400).send({ status: 'error', reason: 'Invalid activity' })
+    }
+}
+
+export async function postConversation(req: express.Request, res: express.Response) {
+    const clientId = req.header('X-Client-Id') || 'unknown-client'
+    const body: { [p: string]: string } = req.body
+    if (!body?.id || !body?.name || !body?.ownerId || !body?.ownerName) {
+        console.log(`Missing key in conversation POST body from ${clientId}: ${JSON.stringify(body)}`)
+        res.status(400).send({ status: 'error', reason: 'Invalid conversation POST data' })
+        return
+    }
+    const info: ConversationInfo = { id: body.id, name: body.name, ownerId: body.ownerId }
+    const existing = await getConversationInfo(info.id)
+    if (existing && existing.ownerId != info.ownerId) {
+        console.error(`Collision on owner profile ${info.id}: POST from client ${clientId} is rejected`)
+        res.status(409).send({ status: 'error', reason: `Owner ID doesn't match existing` })
+        return
+    }
+    await setConversationInfo(info)
+    const update: ProfileData = { id: body.ownerId, name: body.ownerName }
+    await saveProfileData(update)
+    if (existing) {
+        console.info(`Posted conversation ${info.id} from client ${clientId} already exists`)
+        res.status(204).send()
+    } else {
+        console.log(`New conversation ${info.id} posted from client ${clientId}`)
+        res.status(201).send()
     }
 }
 
@@ -61,18 +84,23 @@ export async function listenToConversation(req: express.Request, res: express.Re
     function setCookie(name: string, value: string) {
         res.cookie(name, value, { maxAge: 365 * 24 * 60 * 60 * 1000, httpOnly: false })
     }
+
     const conversationId = req.params?.conversationId
+    let haveConversationData = true
     if (!conversationId || !conversationId.match(/^[-0-9a-zA-Z]{36}$/)) {
         console.error(`Received listen link for invalid conversation id ${conversationId}`)
-        res.setHeader('Location', '/subscribe404.html')
-        res.status(303).send()
-        return
+        haveConversationData = false
     }
-    console.log(`Received listen link for conversation id ${conversationId}`)
-    const conversationKey = `con:${conversationId}`
-    const info = await getConversationInfo(conversationKey)
-    console.log(`Fetched conversation info for listener: ${JSON.stringify(info)}`)
+    const info = await getConversationInfo(conversationId)
+    const profileData = info ? await getProfileData(info.ownerId) : undefined
     if (!info) {
+        console.error(`Received listen link for unknown conversation ${conversationId}`)
+        haveConversationData = false
+    } else if (!profileData?.name) {
+        console.error(`Received listen link for conversation with unknown profile owner ${info.ownerId}`)
+        haveConversationData = false
+    }
+    if (!haveConversationData) {
         res.setHeader('Location', '/subscribe404.html')
         res.status(303).send()
         return
@@ -80,14 +108,16 @@ export async function listenToConversation(req: express.Request, res: express.Re
     let clientId = req?.session?.clientId
     if (!clientId) {
         clientId = randomUUID().toUpperCase()
+        console.log(`Created new client for web: ${clientId}`)
     }
+    console.log(`Sending listen page for conversation ${conversationId} to client ${clientId}`)
     req.session = { clientId, conversationId }
     setCookie('conversationId', conversationId)
-    setCookie('conversationName', info.name)
-    setCookie('whispererName', info.ownerName)
+    setCookie('conversationName', info!.name)
+    setCookie('whispererName', profileData!.name!)
     setCookie('clientId', clientId)
     setCookie('clientName', req.cookies?.clientName || '')
-    const body = subscribe_response(info.name, info.ownerName)
+    const body = subscribe_response(info!.name, profileData!.name!)
     res.status(200).send(body)
 }
 
@@ -95,7 +125,7 @@ export async function listenTokenRequest(req: express.Request, res: express.Resp
     const clientId = req?.session?.clientId
     const conversationId = req?.session?.conversationId
     if (!clientId || !conversationId) {
-        console.error("Refusing listen token request outside of session")
+        console.error('Refusing listen token request outside of session')
         res.status(403).send({ status: 'error', reason: 'no session to support authentication' })
         return
     }
@@ -104,153 +134,142 @@ export async function listenTokenRequest(req: express.Request, res: express.Resp
     res.status(200).send(tokenRequest)
 }
 
+export async function postUsername(req: express.Request, res: express.Response) {
+    const clientId = req.header('X-Client-Id') || 'unknown-client'
+    const body: { [p: string]: string } = req.body
+    if (!body?.id || !body?.name) {
+        console.log(`Missing key in username POST body from ${clientId}: ${JSON.stringify(body)}`)
+        res.status(400).send({ status: 'error', reason: 'Invalid username POST data' })
+        return
+    }
+    const update: ProfileData = { id: body.id, name: body.name }
+    await saveProfileData(update)
+    console.info(`Posted username for profile ${body.id} from client ${clientId}`)
+    res.status(204).send()
+}
+
 export async function userProfilePost(req: express.Request, res: express.Response) {
+    const clientId = req.header('X-Client-Id') || 'unknown-client'
     const body: { [p: string]: string } = req.body
     if (!body.id || !body.name || !body.password) {
-        console.log(`User profile POST is missing data`)
-        res.status(400).send({ status: `error`, reason: `Invalid POST data` });
+        console.log(`User profile POST from client ${clientId} is missing data`)
+        res.status(400).send({ status: `error`, reason: `Invalid POST data` })
         return
     }
     const existingData = await getProfileData(body.id)
     if (existingData?.name) {
-        console.error(`User profile POST for ${body.id} but the profile exists`)
-        res.status(409).send({status: `error`, reason: `Profile ${body.id} already exists`})
+        console.error(`User profile POST for ${body.id} from client ${clientId} but the profile exists`)
+        res.status(409).send({ status: `error`, reason: `Profile ${body.id} already exists` })
         return
     }
     const newData: ProfileData = {
         id: body.id,
         name: body.name,
-        password: body.password
+        password: body.password,
     }
     await saveProfileData(newData)
-    console.log(`Successful POST of user profile ${body.id}`)
+    console.log(`Successful POST of user profile ${body.id} from client ${clientId}`)
     res.status(201).send()
 }
 
 export async function userProfilePut(req: express.Request, res: express.Response) {
+    const clientId = req.header('X-Client-Id') || 'unknown-client'
     const body: { [p: string]: string } = req.body
     const profileId = req.params?.profileId
     if (!profileId || !body?.name) {
-        console.log(`User profile PUT is missing data`)
-        res.status(400).send({ status: `error`, reason: `Invalid PUT data` });
+        console.log(`User profile PUT from client ${clientId} is missing data`)
+        res.status(400).send({ status: `error`, reason: `Invalid PUT data` })
         return
     }
     const existingData = await getProfileData(profileId)
-    if (!existingData || !existingData?.name) {
-        console.error(`User profile PUT for ${profileId} but the profile does not exist`)
-        res.status(404).send({status: `error`, reason: `Profile ${profileId} doesn't exist`})
+    if (!existingData || !existingData.password) {
+        console.error(`User profile PUT for ${profileId} from client ${clientId} but the profile does not exist`)
+        res.status(404).send({ status: `error`, reason: `Profile ${profileId} doesn't exist` })
         return
     }
-    const auth = req.header('Authorization')
-    if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
-        console.log(`Missing or invalid authorization header: ${auth}`)
-        res.status(403).send({ status: 'error', reason: 'Invalid authorization header' })
-        return
-    }
-    if (auth.substring(7) != existingData.password) {
-        console.error(`User profile PUT has incorrect password`)
-        res.status(403).send({status: `error`, reason: `Invalid authorization` })
-        return
-    }
+    if (!await validateProfileAuth(req, res, existingData.password)) return
+    console.log(`Successful PUT of user profile ${existingData.id} from client ${clientId}`)
     existingData.name = body.name
     await saveProfileData(existingData)
-    console.log(`Successful PUT of user profile ${existingData.id}`)
     res.status(204).send()
 }
 
 export async function userProfileGet(req: express.Request, res: express.Response) {
+    const clientId = req.header('X-Client-Id') || 'unknown-client'
     const profileId = req.params?.profileId
     if (!profileId) {
-        console.log(`No profile ID specified in GET`)
-        res.status(404).send({ status: `error`, reason: `No such profile` });
+        console.log(`No profile ID specified in GET from client ${clientId}`)
+        res.status(404).send({ status: `error`, reason: `No such profile` })
         return
     }
     const existingData = await getProfileData(profileId)
     if (!existingData || !existingData?.name || !existingData?.password) {
-        console.error(`User profile GET for ${profileId} but the profile does not exist`)
-        res.status(404).send({status: `error`, reason: `Profile ${profileId} doesn't exist`})
+        console.error(`User profile GET from client ${clientId} for profile ${profileId} but it does not exist`)
+        res.status(404).send({ status: `error`, reason: `Profile ${profileId} doesn't exist` })
         return
     }
-    const auth = req.header('Authorization')
-    if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
-        console.log(`Missing or invalid authorization header: ${auth}`)
-        res.status(403).send({ status: 'error', reason: 'Invalid authorization header' })
-        return
-    }
-    if (auth.substring(7) != existingData.password) {
-        console.error(`User profile PUT has incorrect password`)
-        res.status(403).send({status: `error`, reason: `Invalid authorization` })
-        return
-    }
-    const precondition = req.header("If-None-Match")
+    if (!await validateProfileAuth(req, res, existingData.password)) return
+    const precondition = req.header('If-None-Match')
     if (precondition && precondition === `"${existingData.name}"`) {
-        console.log(`User profile name matches client-submitted name, returning Precondition Failed`)
-        res.status(412).send({status: `error`, reason: `Server name matches client name`})
+        console.log(`User profile name matches name from client ${clientId}, returning Precondition Failed`)
+        res.status(412).send({ status: `error`, reason: `Server name matches client name` })
         return
     }
-    console.log(`Successful GET of user profile ${existingData.id}`)
+    console.log(`Successful GET of user profile ${existingData.id} from client ${clientId}`)
     const body = { id: existingData.id, name: existingData.name }
-    res.setHeader("ETag", `"${existingData.name}"`)
+    res.setHeader('ETag', `"${existingData.name}"`)
     res.status(200).send(body)
 }
 
 export async function whisperProfilePost(req: express.Request, res: express.Response) {
+    const clientId = req.header('X-Client-Id') || 'unknown-client'
     const body: { [p: string]: string } = req.body
     if (!body?.id || !body?.timestamp) {
-        console.log(`Whisper profile POST is missing data`)
-        res.status(400).send({ status: `error`, reason: `Invalid POST data` });
+        console.log(`Whisper profile POST from client ${clientId} is missing data`)
+        res.status(400).send({ status: `error`, reason: `Invalid POST data` })
         return
     }
     const existingData = await getProfileData(body.id)
     if (existingData?.whisperProfile) {
-        console.error(`Whisper profile POST for ${body.id} but the whisper profile exists`)
-        res.status(409).send({status: `error`, reason: `Whisper profile ${body.id} already exists`})
+        console.error(`Whisper profile POST for ${body.id} from client ${clientId} but the whisper profile exists`)
+        res.status(409).send({ status: `error`, reason: `Whisper profile ${body.id} already exists` })
         return
     }
+    console.log(`Successful POST of whisper profile ${body.id} from client ${clientId}`)
     const newData: ProfileData = {
         id: body.id,
         whisperTimestamp: body.timestamp,
-        whisperProfile: JSON.stringify(body)
+        whisperProfile: JSON.stringify(body),
     }
     await saveProfileData(newData)
-    console.log(`Successful POST of whisper profile ${body.id}`)
     res.status(201).send()
 }
 
 export async function whisperProfilePut(req: express.Request, res: express.Response) {
+    const clientId = req.header('X-Client-Id') || 'unknown-client'
     const profileId = req.params?.profileId
     if (!profileId) {
-        console.log(`Whisper profile PUT is missing profile ID`)
-        res.status(404).send({ status: `error`, reason: `Invalid Profile ID` });
+        console.log(`Whisper profile PUT from client ${clientId} is missing profile ID`)
+        res.status(404).send({ status: `error`, reason: `Invalid Profile ID` })
         return
     }
     if (!req.body || !req.body?.timestamp) {
-        console.error(`Whisper profile PUT is missing a timestamp`)
-        res.status(400).send({ status: `error`, reason: `Missing timestamp`})
+        console.error(`Whisper profile PUT from client ${clientId} is missing a timestamp`)
+        res.status(400).send({ status: `error`, reason: `Missing timestamp` })
         return
     }
     const existingData = await getProfileData(profileId)
     if (!existingData?.password || !existingData?.whisperTimestamp || !existingData?.whisperProfile) {
-        console.error(`Whisper profile PUT for ${profileId} but the profile does not exist`)
-        res.status(404).send({status: `error`, reason: `Whisper profile ${profileId} doesn't exist`})
+        console.error(`Whisper profile PUT for ${profileId} from client ${clientId} but the profile does not exist`)
+        res.status(404).send({ status: `error`, reason: `Whisper profile ${profileId} doesn't exist` })
         return
     }
-    const auth = req.header('Authorization')
-    if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
-        console.log(`Missing or invalid authorization header: ${auth}`)
-        res.status(403).send({ status: 'error', reason: 'Invalid authorization header' })
-        return
-    }
-    if (auth.substring(7) != existingData.password) {
-        console.error(`Whisper profile PUT has incorrect password`)
-        res.status(403).send({status: `error`, reason: `Invalid authorization` })
-        return
-    }
+    if (!await validateProfileAuth(req, res, existingData.password)) return
     if (existingData.whisperTimestamp > req.body.timestamp) {
-        console.error(`Post of whisper profile has older timestamp`)
-        res.status(409).send({status: `error`, reason: `Newer whisper profile version on server`})
+        console.error(`PUT of whisper profile from ${clientId} has older timestamp`)
+        res.status(409).send({ status: `error`, reason: `Newer whisper profile version on server` })
     }
-    console.log(`Successful PUT of whisper profile ${existingData.id}`)
+    console.log(`Successful PUT of whisper profile ${existingData.id} from client ${clientId}`)
     const newData: ProfileData = {
         id: existingData.id,
         whisperTimestamp: req.body.timestamp,
@@ -261,98 +280,81 @@ export async function whisperProfilePut(req: express.Request, res: express.Respo
 }
 
 export async function whisperProfileGet(req: express.Request, res: express.Response) {
+    const clientId = req.header('X-Client-Id') || 'unknown-client'
     const profileId = req.params?.profileId
     if (!profileId) {
-        console.log(`No profile ID specified in GET`)
-        res.status(404).send({ status: `error`, reason: `No such profile` });
+        console.log(`No profile ID specified in GET from client ${clientId}`)
+        res.status(404).send({ status: `error`, reason: `No such profile` })
         return
     }
     const existingData = await getProfileData(profileId)
     if (!existingData || !existingData?.password || !existingData.whisperTimestamp || !existingData.whisperProfile) {
-        console.error(`Whisper profile get for ${profileId} but the profile does not exist`)
-        res.status(404).send({status: `error`, reason: `Whisper profile ${profileId} doesn't exist`})
+        console.error(`Whisper profile get for ${profileId} from client ${clientId} but the profile does not exist`)
+        res.status(404).send({ status: `error`, reason: `Whisper profile ${profileId} doesn't exist` })
         return
     }
-    const auth = req.header('Authorization')
-    if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
-        console.log(`Missing or invalid authorization header: ${auth}`)
-        res.status(403).send({ status: 'error', reason: 'Invalid authorization header' })
-        return
-    }
-    if (auth.substring(7) != existingData.password) {
-        console.error(`User profile PUT has incorrect password`)
-        res.status(403).send({status: `error`, reason: `Invalid authorization` })
-        return
-    }
-    const precondition = req.header("If-None-Match")
+    if (!await validateProfileAuth(req, res, existingData.password)) return
+    const precondition = req.header('If-None-Match')
     if (precondition && precondition === `"${existingData.whisperTimestamp}"`) {
-        console.log(`Whisper profile timestamp matches client-submitted timestamp, returning Precondition Failed`)
-        res.status(412).send({status: `error`, reason: `Server whisper timestamp matches client timestamp`})
+        console.log(`Whisper profile timestamp matches timestamp from client ${clientId}, returning Precondition Failed`)
+        res.status(412).send({ status: `error`, reason: `Server whisper timestamp matches client timestamp` })
         return
     }
-    console.log(`Successful GET of whisper profile ${existingData.id}`)
-    res.setHeader("ETag", `"${existingData.whisperTimestamp}"`)
+    console.log(`Successful GET of whisper profile ${existingData.id} from client ${clientId}`)
+    res.setHeader('ETag', `"${existingData.whisperTimestamp}"`)
     const body = JSON.parse(existingData.whisperProfile)
     res.status(200).send(body)
 }
 
 export async function listenProfilePost(req: express.Request, res: express.Response) {
+    const clientId = req.header('X-Client-Id') || 'unknown-client'
     const body: { [p: string]: string } = req.body
     if (!body?.id || !body?.timestamp) {
-        console.log(`Listen profile POST is missing data`)
-        res.status(400).send({ status: `error`, reason: `Invalid POST data` });
+        console.log(`Listen profile POST from client ${clientId} is missing data`)
+        res.status(400).send({ status: `error`, reason: `Invalid POST data` })
         return
     }
     const existingData = await getProfileData(body.id)
     if (existingData?.listenProfile) {
-        console.error(`Listen profile POST for ${body.id} but the listen profile exists`)
-        res.status(409).send({status: `error`, reason: `Listen profile ${body.id} already exists`})
+        console.error(`Listen profile POST for ${body.id} from ${clientId} but the listen profile exists`)
+        res.status(409).send({ status: `error`, reason: `Listen profile ${body.id} already exists` })
         return
     }
+    console.log(`Successful POST of listen profile ${body.id} from client ${clientId}`)
     const newData: ProfileData = {
         id: body.id,
         listenTimestamp: body.timestamp,
-        listenProfile: JSON.stringify(body)
+        listenProfile: JSON.stringify(body),
     }
     await saveProfileData(newData)
-    console.log(`Successful POST of listen profile ${body.id}`)
     res.status(201).send()
 }
 
 export async function listenProfilePut(req: express.Request, res: express.Response) {
+    const clientId = req.header('X-Client-Id') || 'unknown-client'
     const profileId = req.params?.profileId
     if (!profileId) {
-        console.log(`Listen profile PUT is missing profile ID`)
-        res.status(404).send({ status: `error`, reason: `Invalid Profile ID` });
+        console.log(`Listen profile PUT from client ${clientId} is missing profile ID`)
+        res.status(404).send({ status: `error`, reason: `Invalid Profile ID` })
         return
     }
     if (!req.body || !req.body?.timestamp) {
-        console.error(`Listen profile PUT is missing a timestamp`)
-        res.status(400).send({ status: `error`, reason: `Missing timestamp`})
+        console.error(`Listen profile PUT from client ${clientId} is missing a timestamp`)
+        res.status(400).send({ status: `error`, reason: `Missing timestamp` })
         return
     }
     const existingData = await getProfileData(profileId)
     if (!existingData?.password || !existingData?.listenTimestamp || !existingData?.listenProfile) {
-        console.error(`Listen profile PUT for ${profileId} but the profile does not exist`)
-        res.status(404).send({status: `error`, reason: `Listen profile ${profileId} doesn't exist`})
+        console.error(`Listen profile PUT for ${profileId} from client ${clientId} but the profile does not exist`)
+        res.status(404).send({ status: `error`, reason: `Listen profile ${profileId} doesn't exist` })
         return
     }
-    const auth = req.header('Authorization')
-    if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
-        console.log(`Missing or invalid authorization header: ${auth}`)
-        res.status(403).send({ status: 'error', reason: 'Invalid authorization header' })
-        return
-    }
-    if (auth.substring(7) != existingData.password) {
-        console.error(`Listen profile PUT has incorrect password`)
-        res.status(403).send({status: `error`, reason: `Invalid authorization` })
-        return
-    }
+    if (!await validateProfileAuth(req, res, existingData.password)) return
     if (existingData.listenTimestamp > req.body.timestamp) {
-        console.error(`Post of listen profile has older timestamp`)
-        res.status(409).send({status: `error`, reason: `Newer listen profile version on server`})
+        console.error(`Post of listen profile from client ${clientId} has older timestamp`)
+        res.status(409).send({ status: `error`, reason: `Newer listen profile version on server` })
     }
-    console.log(`Successful PUT of listen profile ${existingData.id}`)
+    console.log(`Successful PUT of listen profile ${existingData.id} from client ${clientId}`)
     const newData: ProfileData = {
         id: existingData.id,
         listenTimestamp: req.body.timestamp,
@@ -363,37 +365,28 @@ export async function listenProfilePut(req: express.Request, res: express.Respon
 }
 
 export async function listenProfileGet(req: express.Request, res: express.Response) {
+    const clientId = req.header('X-Client-Id') || 'unknown-client'
     const profileId = req.params?.profileId
     if (!profileId) {
-        console.log(`No profile ID specified in GET`)
-        res.status(404).send({ status: `error`, reason: `No such profile` });
+        console.log(`No profile ID specified in GET from client ${clientId}`)
+        res.status(404).send({ status: `error`, reason: `No such profile` })
         return
     }
     const existingData = await getProfileData(profileId)
     if (!existingData || !existingData?.password || !existingData.listenTimestamp || !existingData.listenProfile) {
-        console.error(`Listen profile get for ${profileId} but the profile does not exist`)
-        res.status(404).send({status: `error`, reason: `Listen profile ${profileId} doesn't exist`})
+        console.error(`Listen profile get for ${profileId} from client ${clientId} but the profile does not exist`)
+        res.status(404).send({ status: `error`, reason: `Listen profile ${profileId} doesn't exist` })
         return
     }
-    const auth = req.header('Authorization')
-    if (!auth || !auth.toLowerCase().startsWith('bearer ')) {
-        console.log(`Missing or invalid authorization header: ${auth}`)
-        res.status(403).send({ status: 'error', reason: 'Invalid authorization header' })
-        return
-    }
-    if (auth.substring(7) != existingData.password) {
-        console.error(`User profile PUT has incorrect password`)
-        res.status(403).send({status: `error`, reason: `Invalid authorization` })
-        return
-    }
-    const precondition = req.header("If-None-Match")
+    if (!await validateProfileAuth(req, res, existingData.password)) return
+    const precondition = req.header('If-None-Match')
     if (precondition && precondition === `"${existingData.listenTimestamp}"`) {
-        console.log(`Listen profile timestamp matches client-submitted timestamp, returning Precondition Failed`)
-        res.status(412).send({status: `error`, reason: `Server listen timestamp matches client timestamp`})
+        console.log(`Listen profile timestamp matches timestamp from client ${clientId}, returning Precondition Failed`)
+        res.status(412).send({ status: `error`, reason: `Server listen timestamp matches client timestamp` })
         return
     }
-    console.log(`Successful GET of listen profile ${existingData.id}`)
-    res.setHeader("ETag", `"${existingData.listenTimestamp}"`)
+    console.log(`Successful GET of listen profile ${existingData.id} from client ${clientId}`)
+    res.setHeader('ETag', `"${existingData.listenTimestamp}"`)
     const body = JSON.parse(existingData.listenProfile)
     res.status(200).send(body)
 }

@@ -1,8 +1,8 @@
-// Copyright 2023 Daniel C. Brotsky. All rights reserved.
+// Copyright 2023-2024 Daniel C. Brotsky. All rights reserved.
 // Licensed under the GNU Affero General Public License v3.
 // See the LICENSE file for details.
 
-import {dbKeyPrefix, getDb} from './db.js'
+import { dbKeyPrefix, getDb } from './db.js'
 
 export interface ClientData {
     id: string,
@@ -14,32 +14,34 @@ export interface ClientData {
     secretDate?: number,
     pushId?: string,
     appInfo?: string,
-    userName?: string,      // used in v1
+    userName?: string,      // used in v1 & v2
     profileId?: string,     // used in v2
-    profileTimestamp?: number
+    lastLaunch?: number,
 }
 
-export async function getClientData(clientKey: string) {
+export async function getClientData(id: string) {
     const rc = await getDb()
-    const existing: {[index:string]: string | number} = await rc.hGetAll(dbKeyPrefix + clientKey)
+    const clientKey = dbKeyPrefix + `cli:${id}`
+    const existing: { [index: string]: string | number } = await rc.hGetAll(clientKey)
     if (!existing?.id) {
         return undefined
     }
-    if (typeof existing?.tokenDate === "string") {
+    if (typeof existing?.tokenDate === 'string') {
         existing.tokenDate = parseInt(existing.tokenDate)
     }
-    if (typeof existing?.secretDate === "string") {
+    if (typeof existing?.secretDate === 'string') {
         existing.secretDate = parseInt(existing.secretDate)
     }
-    if (typeof existing?.profileTimestamp === 'string') {
-        existing.profileTimestamp = parseInt(existing.profileTimestamp)
+    if (typeof existing?.lastLaunch === 'string') {
+        existing.lastLaunch = parseInt(existing.lastLaunch)
     }
     return existing as unknown as ClientData
 }
 
-export async function setClientData(clientKey: string, clientData: ClientData) {
+export async function setClientData(clientData: ClientData) {
     const rc = await getDb()
-    await rc.hSet(dbKeyPrefix + clientKey, { ...clientData })
+    const clientKey = dbKeyPrefix + `cli:${clientData.id}`
+    await rc.hSet(clientKey, { ...clientData })
 }
 
 export interface HasClientChanged {
@@ -47,52 +49,26 @@ export interface HasClientChanged {
     changeReason: string
 }
 
-export async function hasClientChanged(clientKey: string, received: ClientData) {
-    const existing = await getClientData(clientKey)
+export async function hasClientChanged(id: string, received: ClientData) {
+    const existing = await getClientData(id)
     // see refreshSecret for explanation of logic around lastSecret
     let clientChanged = false
-    let changeReason = ""
+    let changeReason = ''
     if (!existing) {
         clientChanged = true
-        changeReason = "APNS token from new"
+        changeReason = 'APNS token from new'
     }
     if (!clientChanged && received.lastSecret !== existing?.lastSecret) {
         clientChanged = true
-        changeReason = "unconfirmed secret from existing"
+        changeReason = 'unconfirmed secret from existing'
     }
     if (!clientChanged && received.token !== existing?.token) {
         clientChanged = true
-        changeReason = "new APNS token from existing"
+        changeReason = 'new APNS token from existing'
     }
     if (!clientChanged && received.appInfo !== existing?.appInfo) {
         clientChanged = true
-        changeReason = "new build data from existing"
+        changeReason = 'new build data from existing'
     }
-    return {clientChanged, changeReason} as HasClientChanged
-}
-
-export interface ProfileData {
-    id: string
-    name?: string
-    password?: string
-    whisperTimestamp?: string
-    whisperProfile?: string
-    listenTimestamp?: string
-    listenProfile?: string
-}
-
-export async function getProfileData(id: string) {
-    const rc = await getDb()
-    const profileKey = dbKeyPrefix + `pro:${id}`
-    const dbData: {[index:string]: string} = await rc.hGetAll(profileKey)
-    if (!dbData?.id) {
-        return undefined
-    }
-    return { ...dbData } as unknown as ProfileData
-}
-
-export async function saveProfileData(profileData: ProfileData) {
-    const rc = await getDb()
-    const profileKey = dbKeyPrefix + `pro:${profileData.id}`
-    await rc.hSet(profileKey, { ...profileData })
+    return { clientChanged, changeReason } as HasClientChanged
 }

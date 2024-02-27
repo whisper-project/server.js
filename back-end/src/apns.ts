@@ -1,11 +1,11 @@
-// Copyright 2023 Daniel C. Brotsky. All rights reserved.
+// Copyright 2023-2024 Daniel C. Brotsky. All rights reserved.
 // Licensed under the GNU Affero General Public License v3.
 // See the LICENSE file for details.
 
-import {fetch} from 'fetch-h2'
-import {createApnsJwt, refreshSecret} from './auth.js'
-import {getSettings} from './settings.js'
-import {dbKeyPrefix, getDb} from './db.js'
+import { fetch } from 'fetch-h2'
+import { createApnsJwt, refreshSecret } from './auth.js'
+import { getSettings } from './settings.js'
+import { dbKeyPrefix, getDb } from './db.js'
 
 interface ApnsRequestData {
     id: string,
@@ -18,7 +18,7 @@ interface ApnsRequestData {
 
 export async function getApnsRequestData(requestKey: string) {
     const db = await getDb()
-    const existing: {[index:string]: string | number} = await db.hGetAll(dbKeyPrefix + requestKey)
+    const existing: { [index: string]: string | number } = await db.hGetAll(dbKeyPrefix + requestKey)
     if (!existing?.id) {
         return undefined
     }
@@ -37,27 +37,27 @@ export async function setApnsRequestData(requestKey: string, data: ApnsRequestDa
     await rc.hSet(dbKeyPrefix + requestKey, update)
 }
 
-export async function sendSecretToClient(clientKey: string, force: boolean = false) {
+export async function sendSecretToClient(clientId: string, force: boolean = false) {
     const config = getSettings()
-    const { didRefresh, clientData } = await refreshSecret(clientKey, force)
+    const { didRefresh, clientData } = await refreshSecret(clientId, force)
     if (!didRefresh) {
-        console.log(`Client ${clientKey} already has its secret`)
+        console.log(`Client ${clientId} already has its secret`)
         return true
     }
-    console.log(`Pushing secret to client ${clientKey}`)
+    console.log(`Pushing secret to client ${clientId}`)
     const server = config.apnsUrl
     const path = `/3/device/${clientData.token}`
     const secret64 = Buffer.from(clientData.secret!, 'hex').toString('base64')
     const body = {
-        "aps" : {
-            "content-available" : 1
+        'aps': {
+            'content-available': 1,
         },
-        "secret" : secret64,
+        'secret': secret64,
     }
     const requestKey = `req:${clientData.pushId!}`
     const requestData: ApnsRequestData = {
         id: clientData.pushId!,
-        clientKey,
+        clientKey: clientId,
         status: -1,
     }
     try {
@@ -71,11 +71,11 @@ export async function sendSecretToClient(clientKey: string, force: boolean = fal
                 'apns-id': clientData.pushId!,
                 'apns-push-type': 'background',
                 'apns-priority': '5',
-                'apns-topic': 'io.clickonetwo.whisper'
+                'apns-topic': 'io.clickonetwo.whisper',
             },
             redirect: 'error',
             json: body,
-        });
+        })
         requestData.status = response.status
         const devId = response.headers.get('apns-unique-id')
         if (devId) {
@@ -91,8 +91,7 @@ export async function sendSecretToClient(clientKey: string, force: boolean = fal
         } else {
             console.log(`APNS post completed with status ${response.status}`)
         }
-    }
-    catch (err) {
+    } catch (err) {
         console.log(`APNS post failed due to error: ${err}`)
     }
     await setApnsRequestData(requestKey, requestData)

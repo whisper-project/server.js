@@ -1,4 +1,4 @@
-// Copyright 2023 Daniel C. Brotsky. All rights reserved.
+// Copyright 2023-2024 Daniel C. Brotsky. All rights reserved.
 // Licensed under the GNU Affero General Public License v3.
 // See the LICENSE file for details.
 
@@ -51,7 +51,7 @@ function envSettings(): Settings {
         apnsCredId: process.env['APNS_CRED_ID'],
         apnsTeamId: process.env['APNS_TEAM_ID'],
         dbUrl: process.env['REDISCLOUD_URL'],
-        dbKeyPrefix: process.env['DB_KEY_PREFIX']
+        dbKeyPrefix: process.env['DB_KEY_PREFIX'],
     }
     for (const key in fromEnv) {
         if (!fromEnv[key]) {
@@ -70,6 +70,6 @@ function testSettings(): Settings {
         apnsCredId: '89AB98CD89',
         apnsTeamId: '8CD8989AB9',
         dbUrl: 'redis://',
-        dbKeyPrefix: 't:'
+        dbKeyPrefix: 't:',
     }
 }

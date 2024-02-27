@@ -1,4 +1,4 @@
-// Copyright 2023 Daniel C. Brotsky. All rights reserved.
+// Copyright 2023-2024 Daniel C. Brotsky. All rights reserved.
 // Licensed under the GNU Affero General Public License v3.
 // See the LICENSE file for details.
 
@@ -10,6 +10,6 @@ module.exports = {
     plugins: ['@typescript-eslint', 'react'],
     root: true,
     rules: {
-        '@typescript-eslint/no-unused-vars': ['error', {'varsIgnorePattern': '^_', 'argsIgnorePattern': '^_'}]
-    }
-};
+        '@typescript-eslint/no-unused-vars': ['error', { 'varsIgnorePattern': '^_', 'argsIgnorePattern': '^_' }],
+    },
+}

@@ -33,6 +33,7 @@ const client = new Ably.Realtime.Promise({
     clientId: clientId,
     authUrl: '/api/v2/listenTokenRequest',
     echoMessages: false,
+    log: { level: 4 },
 })
 
 interface Text {

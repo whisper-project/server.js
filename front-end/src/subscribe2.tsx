@@ -98,7 +98,7 @@ function NameView(props: { confirm: (msg: string) => void }) {
                     />
                 </Grid>
                 <Grid item alignItems="stretch" style={{ display: 'flex' }}>
-                    <Button variant="contained" onClick={onConfirm}>
+                    <Button variant="contained" onClick={onConfirm} disabled={name.length == 0}>
                         Agree & Provide Name
                     </Button>
                 </Grid>

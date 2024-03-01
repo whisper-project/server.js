@@ -23,7 +23,6 @@ const conversationName = Cookies.get('conversationName') || ''
 const whispererName = Cookies.get('whispererName') || ''
 const clientId = Cookies.get('clientId') || ''
 let clientName = Cookies.get('clientName') || ''
-const repeatControlChannelPackets = Cookies.get('repeatControlChannelPackets') || ''
 
 if (!conversationId || !whispererName || !clientId || !conversationName) {
     window.location.href = '/subscribe404.html'
@@ -33,6 +32,7 @@ const client = new Ably.Realtime.Promise({
     clientId: clientId,
     authUrl: '/api/v2/listenTokenRequest',
     echoMessages: false,
+    // log: { level: 4 },
 })
 
 interface Text {
@@ -98,7 +98,7 @@ function NameView(props: { confirm: (msg: string) => void }) {
                     />
                 </Grid>
                 <Grid item alignItems="stretch" style={{ display: 'flex' }}>
-                    <Button variant="contained" onClick={onConfirm}>
+                    <Button variant="contained" onClick={onConfirm} disabled={name.length == 0}>
                         Agree & Provide Name
                     </Button>
                 </Grid>
@@ -241,40 +241,9 @@ function LivePastText(props: { text: Text }) {
     )
 }
 
-const controlQueue: { id: string, chunk: string }[] = []
-let lastControlOffset: string = ''
-
 function sendControlChunk(channel: Ably.Types.RealtimeChannelPromise, id: string, chunk: string) {
-    if (controlQueue.length == 0) {
-        console.debug(`Sending control chunk: ${chunk}`)
-        channel.publish(id, chunk).then()
-        if (repeatControlChannelPackets) {
-            let current = { id, chunk }
-            controlQueue.push(current)
-            let count = 1
-
-            function resend() {
-                if (count >= 3) {
-                    controlQueue.shift()
-                    if (controlQueue.length > 0) {
-                        current = controlQueue[0]
-                        count = 0
-                        console.debug(`Sending queued control chunk: ${chunk}`)
-                    } else {
-                        return
-                    }
-                }
-                channel.publish(current.id, current.chunk).then()
-                count += 1
-                setTimeout(resend, 50)
-            }
-
-            setTimeout(resend, 50)
-        }
-    } else {
-        console.debug(`Queueing control chunk: ${chunk}`)
-        controlQueue.push({ id, chunk })
-    }
+    console.debug(`Sending control chunk: ${chunk}`)
+    channel.publish(id, chunk).then()
 }
 
 function receiveControlChunk(message: Ably.Types.Message,
@@ -288,21 +257,14 @@ function receiveControlChunk(message: Ably.Types.Message,
         return
     }
     const info = parseControlChunk(message.data)
-    if (!info) {
-        console.error(`Ignoring invalid control packet: ${message.data}`)
-        setStatus(`Ignoring an invalid packet; see log for details`)
-        return
-    }
-    if (info.offset == lastControlOffset) {
-        // every packet is sent three times, ignore all but the first
-        console.info(`Ignoring repeated control message: ${info.offset}`)
-        return
-    }
-    lastControlOffset = info.offset
-    switch (info.offset) {
+    switch (info?.offset) {
         case 'dropping':
             console.log(`Whisperer is dropping this client`)
             exit(`${whispererName} has stopped whispering.`)
+            break
+        case 'restart':
+            console.log(`Whisperer is restarting`)
+            exit(`${whispererName} has paused the conversation.  Please try listening again.`)
             break
         case 'listenAuthYes':
             console.log(`Received content id: ${info.contentId}`)
@@ -321,7 +283,7 @@ function receiveControlChunk(message: Ably.Types.Message,
         case 'listenAuthNo':
             console.log(`Whisperer refused listener presence`)
             sendDrop(channel)
-            exit(`${whispererName} has refused to let you be in this conversation`)
+            exit(`${whispererName} has refused your presence in this conversation`)
             break
         case 'whisperOffer':
             console.log(`Received Whisper offer, sending request`)
@@ -330,6 +292,10 @@ function receiveControlChunk(message: Ably.Types.Message,
             const offset = controlOffsetValue('listenRequest')
             const chunk = `${offset}|${conversationId}|${info.conversationName}|${clientId}|${clientId}|${clientName}|`
             sendControlChunk(channel, info.clientId, chunk)
+            break
+        default:
+            console.log(`Received unexpected control packet, resending listen offer: ${message.data}`)
+            sendListenOffer(channel)
     }
 }
 
@@ -349,24 +315,9 @@ function receiveContentChunk(message: Ably.Types.Message,
         console.error(`Ignoring invalid content chunk: ${message.data as string}`)
         return
     }
-    if (resetInProgress) {
-        if (chunk.offset === 'startReread') {
-            console.log('Received reset acknowledgement from whisperer, resetting live text')
-            updateText((text: Text) => {
-                return { live: '', past: text.past }
-            })
-        } else if (chunk.isDiff) {
-            console.log('Ignoring diff chunk because a read is in progress')
-        } else if (chunk.offset === 'pastText') {
-            console.log('Received unexpected past line chunk, ignoring it')
-        } else if (chunk.offset === 'liveText') {
-            console.log('Receive live text chunk, update is over')
-            resetInProgress = false
-            updateText((text: Text) => {
-                return { live: chunk.text, past: text.past }
-            })
-        }
-    } else if (chunk.isDiff) {
+    if (chunk.isDiff) {
+        // sometimes we lose the end of resets, so if we get a diff assume it's completed.
+        resetInProgress = false
         if (chunk.offset === 0) {
             updateText((text: Text) => {
                 return { live: chunk.text, past: text.past }
@@ -387,6 +338,25 @@ function receiveContentChunk(message: Ably.Types.Message,
                     return { live: text.live.substring(0, offset) + chunk.text, past: text.past }
                 }
             })
+        }
+    } else if (resetInProgress) {
+        if (chunk.offset === 'startReread') {
+            console.log('Received reset acknowledgement from whisperer, resetting live text')
+            updateText((text: Text) => {
+                return { live: '', past: text.past }
+            })
+        } else if (chunk.isDiff) {
+            console.log('Ignoring diff chunk because a read is in progress')
+        } else if (chunk.offset === 'pastText') {
+            console.log('Received unexpected past line chunk, ignoring it')
+        } else if (chunk.offset === 'liveText') {
+            console.log('Receive live text chunk, update is over')
+            resetInProgress = false
+            updateText((text: Text) => {
+                return { live: chunk.text, past: text.past }
+            })
+        } else {
+            console.log(`Ignoring unexpected chunk during reset: ${chunk}`)
         }
     } else {
         if (typeof chunk.offset === 'string') {
@@ -423,6 +393,8 @@ function parseControlOffset(offset: string): string | undefined {
             return 'dropping'
         case '-26':
             return 'listenOffer'
+        case '-27':
+            return 'restart'
         case '-40':
             return 'requestReread'
         default:
@@ -446,6 +418,8 @@ function controlOffsetValue(offset: string): string | undefined {
             return '-25'
         case 'listenOffer':
             return '-26'
+        case 'restart':
+            return '-27'
         case 'requestReread':
             return '-40'
         default:

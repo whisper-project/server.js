@@ -157,7 +157,7 @@ export async function userProfilePost(req: express.Request, res: express.Respons
         return
     }
     const existingData = await getProfileData(body.id)
-    if (existingData?.name) {
+    if (existingData?.password) {
         console.error(`User profile POST for ${body.id} from client ${clientId} but the profile exists`)
         res.status(409).send({ status: `error`, reason: `Profile ${body.id} already exists` })
         return

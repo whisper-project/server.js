@@ -56,7 +56,7 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
 export async function postConversation(req: express.Request, res: express.Response) {
     const clientId = req.header('X-Client-Id') || 'unknown-client'
     const body: { [p: string]: string } = req.body
-    if (!body?.id || !body?.name || !body?.ownerId || !body?.ownerName) {
+    if (!body?.id || !body?.name || !body?.ownerId || typeof body?.ownerName !== 'string') {
         console.log(`Missing key in conversation POST body from ${clientId}: ${JSON.stringify(body)}`)
         res.status(400).send({ status: 'error', reason: 'Invalid conversation POST data' })
         return

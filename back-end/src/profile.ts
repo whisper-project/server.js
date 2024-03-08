@@ -79,6 +79,10 @@ export async function updateLaunchData(clientId: string, profileId: string, user
         await removeProfileClient(clientData.profileId, clientId)
         await addProfileClient(profileId, clientId)
     }
-    const update: ProfileData = { id: profileId, name: username }
-    await saveProfileData(update)
+    const existing = await getProfileData(profileId)
+    // don't update the username on a shared profile (see #25)
+    if (!existing || !existing.password) {
+        const update: ProfileData = { id: profileId, name: username }
+        await saveProfileData(update)
+    }
 }

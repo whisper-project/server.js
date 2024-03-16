@@ -36,7 +36,7 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
             return
         }
         console.log(`Whisperer ${body.profileId} (${body.username}) ` +
-            `is starting conversation ${conversationId} (${body.conversationName} ` +
+            `is starting conversation ${conversationId} (${body.conversationName}) ` +
             `from client ${clientId}`)
         const info: ConversationInfo = {
             id: conversationId, name: body.conversationName, ownerId: body.profileId,

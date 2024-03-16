@@ -18,7 +18,7 @@ import {
     listenProfileGet,
     postConversation, postUsername,
 } from './routes.js'
-import { asyncWrapper, sessionMiddleware } from '../middleware.js'
+import { asyncWrapper, cookieMiddleware, sessionMiddleware } from '../middleware.js'
 import { apnsReceivedNotification, apnsToken } from '../routes.js'
 
 export const v2router = express.Router()
@@ -38,4 +38,4 @@ v2router
     .post('/conversation', asyncWrapper(postConversation))
     .post('/username', asyncWrapper(postUsername))
     .post('/pubSubTokenRequest', asyncWrapper(pubSubTokenRequest))
-    .get('/listenTokenRequest', [sessionMiddleware], asyncWrapper(listenTokenRequest))
+    .get('/listenTokenRequest', [cookieMiddleware, sessionMiddleware], asyncWrapper(listenTokenRequest))

@@ -49,6 +49,7 @@ export async function apnsToken(req: express.Request, res: express.Response) {
     }
     recentlyReceived.push(received)
     if (received.userName && received.profileId) {
+        console.log(`Received profile ${received.profileId} (${received.userName}) at launch from client ${clientId}`)
         await updateLaunchData(received.id, received.profileId, received.userName)
     }
     const { clientChanged, changeReason } = await hasClientChanged(clientId, received)

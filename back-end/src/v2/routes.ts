@@ -35,8 +35,9 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
             res.status(400).send({ status: 'error', reason: 'Invalid publish POST data' })
             return
         }
-        console.log(`Whisperer ${body.profileId} (${body.username}) with client {$clientId} ` +
-            `is starting conversation ${conversationId} (${body.conversationName}`)
+        console.log(`Whisperer ${body.profileId} (${body.username}) ` +
+            `is starting conversation ${conversationId} (${body.conversationName} ` +
+            `from client ${clientId}`)
         const info: ConversationInfo = {
             id: conversationId, name: body.conversationName, ownerId: body.profileId,
         }
@@ -47,8 +48,9 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
         res.status(200).send({ status: 'success', tokenRequest: JSON.stringify(tokenRequest) })
     } else if (activity.toLowerCase() == 'subscribe') {
         const existing = await getProfileData(body.profileId)
-        console.log(`App Listener ${body.profileId} (${existing?.name}) with client ${clientId} ` +
-            `is looking for conversation ${conversationId} (${body.conversationName})`)
+        console.log(`Listener ${body.profileId} (${existing?.name}) ` +
+            `is looking for conversation ${conversationId} (${body.conversationName}) ` +
+            `with client ${clientId}`)
         const tokenRequest = await createAblySubscribeTokenRequest(clientId, conversationId)
         res.status(200).send({ status: 'success', tokenRequest: JSON.stringify(tokenRequest) })
     } else {
@@ -177,7 +179,7 @@ export async function userProfilePost(req: express.Request, res: express.Respons
         password: body.password,
     }
     await saveProfileData(newData)
-    console.log(`Successful POST of user profile ${body.id} (${body.name} from client ${clientId}`)
+    console.log(`Successful POST of user profile ${body.id} (${body.name}) from client ${clientId}`)
     res.status(201).send()
 }
 
@@ -220,7 +222,7 @@ export async function userProfileGet(req: express.Request, res: express.Response
     if (!await validateProfileAuth(req, res, existingData.password)) return
     const precondition = req.header('If-None-Match')
     if (precondition && precondition === `"${existingData.name}"`) {
-        console.log(`Precondition Failed on GET of user profile $profileId (${existingData.name}) from client ${clientId}`)
+        console.log(`Precondition Failed on GET of user profile ${profileId} (${existingData.name}) from client ${clientId}`)
         res.status(412).send({ status: `error`, reason: `Server name matches client name` })
         return
     }
@@ -305,7 +307,7 @@ export async function whisperProfileGet(req: express.Request, res: express.Respo
     if (!await validateProfileAuth(req, res, existingData.password)) return
     const precondition = req.header('If-None-Match')
     if (precondition && precondition === `"${existingData.whisperTimestamp}"`) {
-        console.log(`Precondition Failed on GET of whisper profile $profileId (${existingData?.name}) from client ${clientId}`)
+        console.log(`Precondition Failed on GET of whisper profile ${profileId} (${existingData?.name}) from client ${clientId}`)
         res.status(412).send({ status: `error`, reason: `Server whisper timestamp matches client timestamp` })
         return
     }
@@ -390,7 +392,7 @@ export async function listenProfileGet(req: express.Request, res: express.Respon
     if (!await validateProfileAuth(req, res, existingData.password)) return
     const precondition = req.header('If-None-Match')
     if (precondition && precondition === `"${existingData.listenTimestamp}"`) {
-        console.log(`Precondition Failed on GET of listen profile $profileId (${existingData.name}) from client ${clientId}`)
+        console.log(`Precondition Failed on GET of listen profile ${profileId} (${existingData.name}) from client ${clientId}`)
         res.status(412).send({ status: `error`, reason: `Server listen timestamp matches client timestamp` })
         return
     }

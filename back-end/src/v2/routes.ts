@@ -405,7 +405,7 @@ export async function listenProfileGet(req: express.Request, res: express.Respon
 export async function settingsProfilePost(req: express.Request, res: express.Response) {
     const clientId = req.header('X-Client-Id') || 'unknown-client'
     const body: { [p: string]: string } = req.body
-    if (!body?.id || !body?.eTag || !body?.settings) {
+    if (!body?.id || !body?.eTag) {
         console.log(`Settings profile POST from client ${clientId} is missing data`)
         res.status(400).send({ status: `error`, reason: `Invalid POST data` })
         return
@@ -420,7 +420,7 @@ export async function settingsProfilePost(req: express.Request, res: express.Res
     const newData: ProfileData = {
         id: body.id,
         settingsETag: body.eTag,
-        settingsProfile: body.settings,
+        settingsProfile: JSON.stringify(body),
     }
     await saveProfileData(newData)
     res.status(201).send()
@@ -434,7 +434,8 @@ export async function settingsProfilePut(req: express.Request, res: express.Resp
         res.status(404).send({ status: `error`, reason: `Invalid Profile ID` })
         return
     }
-    if (!req.body || !req.body['eTag'] || !req.body['settings']) {
+    const body: { [p: string]: string } = req.body
+    if (!body || !body?.eTag) {
         console.error(`Settings profile PUT from client ${clientId} is missing data`)
         res.status(400).send({ status: `error`, reason: `Invalid PUT data` })
         return
@@ -449,8 +450,8 @@ export async function settingsProfilePut(req: express.Request, res: express.Resp
     console.log(`Successful PUT of settings profile ${profileId} (${existingData?.name}) from client ${clientId}`)
     const newData: ProfileData = {
         id: existingData.id,
-        settingsETag: req.body['eTag'],
-        settingsProfile: req.body['settings'],
+        settingsETag: body.eTag,
+        settingsProfile: JSON.stringify(body),
     }
     await saveProfileData(newData)
     res.status(204).send()

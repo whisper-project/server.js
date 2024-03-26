@@ -401,3 +401,84 @@ export async function listenProfileGet(req: express.Request, res: express.Respon
     const body = JSON.parse(existingData.listenProfile)
     res.status(200).send(body)
 }
+
+export async function settingsProfilePost(req: express.Request, res: express.Response) {
+    const clientId = req.header('X-Client-Id') || 'unknown-client'
+    const body: { [p: string]: string } = req.body
+    if (!body?.id || !body?.eTag || !body?.settings) {
+        console.log(`Settings profile POST from client ${clientId} is missing data`)
+        res.status(400).send({ status: `error`, reason: `Invalid POST data` })
+        return
+    }
+    const existingData = await getProfileData(body.id)
+    if (existingData?.settingsProfile) {
+        console.error(`Settings profile POST for already-shared ${body.id} (${existingData?.name}) from ${clientId}`)
+        res.status(409).send({ status: `error`, reason: `Settings profile ${body.id} is already shared` })
+        return
+    }
+    console.log(`Successful POST of settings profile ${body.id} (${existingData?.name}) from client ${clientId}`)
+    const newData: ProfileData = {
+        id: body.id,
+        settingsETag: body.eTag,
+        settingsProfile: body.settings,
+    }
+    await saveProfileData(newData)
+    res.status(201).send()
+}
+
+export async function settingsProfilePut(req: express.Request, res: express.Response) {
+    const clientId = req.header('X-Client-Id') || 'unknown-client'
+    const profileId = req.params?.profileId
+    if (!profileId) {
+        console.log(`Settings profile PUT from client ${clientId} is missing profile ID`)
+        res.status(404).send({ status: `error`, reason: `Invalid Profile ID` })
+        return
+    }
+    if (!req.body || !req.body['eTag'] || !req.body['settings']) {
+        console.error(`Settings profile PUT from client ${clientId} is missing data`)
+        res.status(400).send({ status: `error`, reason: `Invalid PUT data` })
+        return
+    }
+    const existingData = await getProfileData(profileId)
+    if (!existingData?.password || !existingData?.settingsETag || !existingData?.settingsProfile) {
+        console.error(`Settings profile PUT for not-shared ${profileId} (${existingData?.name}) from client ${clientId}`)
+        res.status(404).send({ status: `error`, reason: `Settings profile ${profileId} is not shared` })
+        return
+    }
+    if (!await validateProfileAuth(req, res, existingData.password)) return
+    console.log(`Successful PUT of settings profile ${profileId} (${existingData?.name}) from client ${clientId}`)
+    const newData: ProfileData = {
+        id: existingData.id,
+        settingsETag: req.body['eTag'],
+        settingsProfile: req.body['settings'],
+    }
+    await saveProfileData(newData)
+    res.status(204).send()
+}
+
+export async function settingsProfileGet(req: express.Request, res: express.Response) {
+    const clientId = req.header('X-Client-Id') || 'unknown-client'
+    const profileId = req.params?.profileId
+    if (!profileId) {
+        console.log(`No settings profile ID specified in GET from client ${clientId}`)
+        res.status(404).send({ status: `error`, reason: `No such profile` })
+        return
+    }
+    const existingData = await getProfileData(profileId)
+    if (!existingData || !existingData?.password || !existingData.settingsETag || !existingData.settingsProfile) {
+        console.error(`Settings profile get for non-shared ${profileId} (${existingData?.name}) from client ${clientId}`)
+        res.status(404).send({ status: `error`, reason: `Settings profile ${profileId} is not shared` })
+        return
+    }
+    if (!await validateProfileAuth(req, res, existingData.password)) return
+    const precondition = req.header('If-None-Match')
+    if (precondition && precondition === `"${existingData.settingsETag}"`) {
+        console.log(`Precondition Failed on GET of settings profile ${profileId} (${existingData.name}) from client ${clientId}`)
+        res.status(412).send({ status: `error`, reason: `Server settings eTag matches client eTag` })
+        return
+    }
+    console.log(`Successful GET of settings profile ${profileId} (${existingData?.name}) from client ${clientId}`)
+    res.setHeader('ETag', `"${existingData.settingsETag}"`)
+    const body = JSON.parse(existingData.settingsProfile)
+    res.status(200).send(body)
+}

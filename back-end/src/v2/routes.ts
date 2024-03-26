@@ -246,7 +246,7 @@ export async function whisperProfilePost(req: express.Request, res: express.Resp
         res.status(409).send({ status: `error`, reason: `Whisper profile ${body.id} is already shared` })
         return
     }
-    console.log(`Successful POST of whisper profile ${body.id} (${existingData?.name}) from client ${clientId}`)
+    console.log(`Successful POST of whisper profile ${body.id} (${existingData?.name}, ${body.timestamp}) from client ${clientId}`)
     const newData: ProfileData = {
         id: body.id,
         whisperTimestamp: body.timestamp,
@@ -280,7 +280,7 @@ export async function whisperProfilePut(req: express.Request, res: express.Respo
         console.error(`Whisper profile PUT for older ${profileId} (${existingData?.name}) from ${clientId}`)
         res.status(409).send({ status: `error`, reason: `Newer whisper profile version on server` })
     }
-    console.log(`Successful PUT of whisper profile ${existingData.id} (${existingData?.name}) from client ${clientId}`)
+    console.log(`Successful PUT of whisper profile ${existingData.id} (${existingData?.name}, ${req.body.timestamp}) from client ${clientId}`)
     const newData: ProfileData = {
         id: existingData.id,
         whisperTimestamp: req.body.timestamp,
@@ -311,7 +311,7 @@ export async function whisperProfileGet(req: express.Request, res: express.Respo
         res.status(412).send({ status: `error`, reason: `Server whisper timestamp matches client timestamp` })
         return
     }
-    console.log(`Successful GET of whisper profile ${profileId} (${existingData?.name}) from client ${clientId}`)
+    console.log(`Successful GET of whisper profile ${profileId} (${existingData?.name}, ${existingData.whisperTimestamp}) from client ${clientId}`)
     res.setHeader('ETag', `"${existingData.whisperTimestamp}"`)
     const body = JSON.parse(existingData.whisperProfile)
     res.status(200).send(body)
@@ -331,7 +331,7 @@ export async function listenProfilePost(req: express.Request, res: express.Respo
         res.status(409).send({ status: `error`, reason: `Listen profile ${body.id} is already shared` })
         return
     }
-    console.log(`Successful POST of listen profile ${body.id} (${existingData?.name}) from client ${clientId}`)
+    console.log(`Successful POST of listen profile ${body.id} (${existingData?.name}, ${body.timestamp}) from client ${clientId}`)
     const newData: ProfileData = {
         id: body.id,
         listenTimestamp: body.timestamp,
@@ -365,7 +365,7 @@ export async function listenProfilePut(req: express.Request, res: express.Respon
         console.error(`Listen profile PUT for older ${profileId} (${existingData?.name}) from ${clientId}`)
         res.status(409).send({ status: `error`, reason: `Newer listen profile version on server` })
     }
-    console.log(`Successful PUT of listen profile ${profileId} (${existingData?.name}) from client ${clientId}`)
+    console.log(`Successful PUT of listen profile ${profileId} (${existingData?.name}, ${req.body.timestamp}) from client ${clientId}`)
     const newData: ProfileData = {
         id: existingData.id,
         listenTimestamp: req.body.timestamp,
@@ -396,7 +396,7 @@ export async function listenProfileGet(req: express.Request, res: express.Respon
         res.status(412).send({ status: `error`, reason: `Server listen timestamp matches client timestamp` })
         return
     }
-    console.log(`Successful GET of listen profile ${profileId} (${existingData?.name}) from client ${clientId}`)
+    console.log(`Successful GET of listen profile ${profileId} (${existingData?.name}, ${existingData.listenTimestamp}) from client ${clientId}`)
     res.setHeader('ETag', `"${existingData.listenTimestamp}"`)
     const body = JSON.parse(existingData.listenProfile)
     res.status(200).send(body)
@@ -416,7 +416,7 @@ export async function settingsProfilePost(req: express.Request, res: express.Res
         res.status(409).send({ status: `error`, reason: `Settings profile ${body.id} is already shared` })
         return
     }
-    console.log(`Successful POST of settings profile ${body.id} (${existingData?.name}) from client ${clientId}`)
+    console.log(`Successful POST of settings profile ${body.id} (${existingData?.name}, ${body.eTag}) from client ${clientId}`)
     const newData: ProfileData = {
         id: body.id,
         settingsETag: body.eTag,
@@ -447,7 +447,7 @@ export async function settingsProfilePut(req: express.Request, res: express.Resp
         return
     }
     if (!await validateProfileAuth(req, res, existingData.password)) return
-    console.log(`Successful PUT of settings profile ${profileId} (${existingData?.name}) from client ${clientId}`)
+    console.log(`Successful PUT of settings profile ${profileId} (${existingData?.name}, ${body.eTag}) from client ${clientId}`)
     const newData: ProfileData = {
         id: existingData.id,
         settingsETag: body.eTag,
@@ -478,7 +478,7 @@ export async function settingsProfileGet(req: express.Request, res: express.Resp
         res.status(412).send({ status: `error`, reason: `Server settings eTag matches client eTag` })
         return
     }
-    console.log(`Successful GET of settings profile ${profileId} (${existingData?.name}) from client ${clientId}`)
+    console.log(`Successful GET of settings profile ${profileId} (${existingData?.name}, ${existingData.settingsETag}) from client ${clientId}`)
     res.setHeader('ETag', `"${existingData.settingsETag}"`)
     const body = JSON.parse(existingData.settingsProfile)
     res.status(200).send(body)

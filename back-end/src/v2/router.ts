@@ -16,7 +16,7 @@ import {
     listenProfilePost,
     listenProfilePut,
     listenProfileGet,
-    postConversation, postUsername,
+    postConversation, postUsername, settingsProfilePost, settingsProfilePut, settingsProfileGet,
 } from './routes.js'
 import { asyncWrapper, cookieMiddleware, sessionMiddleware } from '../middleware.js'
 import { apnsReceivedNotification, apnsToken } from '../routes.js'
@@ -35,6 +35,9 @@ v2router
     .post('/listenProfile', asyncWrapper(listenProfilePost))
     .put('/listenProfile/:profileId', asyncWrapper(listenProfilePut))
     .get('/listenProfile/:profileId', asyncWrapper(listenProfileGet))
+    .post('/settingsProfile', asyncWrapper(settingsProfilePost))
+    .put('/settingsProfile/:profileId', asyncWrapper(settingsProfilePut))
+    .get('/settingsProfile/:profileId', asyncWrapper(settingsProfileGet))
     .post('/conversation', asyncWrapper(postConversation))
     .post('/username', asyncWrapper(postUsername))
     .post('/pubSubTokenRequest', asyncWrapper(pubSubTokenRequest))

@@ -13,6 +13,8 @@ export interface ProfileData {
     whisperProfile?: string
     listenTimestamp?: string
     listenProfile?: string
+    settingsETag?: string
+    settingsProfile?: string
 }
 
 export async function getProfileData(id: string) {

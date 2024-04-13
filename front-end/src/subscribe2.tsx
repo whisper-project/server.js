@@ -32,6 +32,7 @@ const client = new Ably.Realtime.Promise({
     clientId: clientId,
     authUrl: '/api/v2/listenTokenRequest',
     echoMessages: false,
+    autoConnect: false,
     // log: { level: 4 },
 })
 
@@ -48,6 +49,8 @@ export default function ListenerView() {
     } else if (exitMsg) {
         return <DisconnectedView message={exitMsg} />
     } else {
+        // don't connect until we have a client name
+        client.connect()
         return (
             <AblyProvider client={client}>
                 <ConnectView exit={(msg) => setExitMsg(msg)} />

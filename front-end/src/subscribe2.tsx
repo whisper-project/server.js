@@ -17,6 +17,8 @@ import '@fontsource/roboto/300.css'
 import '@fontsource/roboto/400.css'
 import '@fontsource/roboto/500.css'
 import '@fontsource/roboto/700.css'
+// @ts-ignore
+import { controlOffsetValue, parseContentChunk, parseControlChunk } from '../../back-end/src/protocol.js'
 
 const conversationId = Cookies.get('conversationId') || ''
 const conversationName = Cookies.get('conversationName') || ''
@@ -367,128 +369,6 @@ function receiveContentChunk(message: Ably.Types.Message,
         } else {
             console.error(`Unimplemented content chunk with offset ${chunk.offset} text: ${chunk.text}`)
         }
-    }
-}
-
-interface ClientInfo {
-    offset: string,
-    conversationId: string,
-    conversationName: string,
-    clientId: string,
-    profileId: string,
-    username: string,
-    contentId: string,
-}
-
-function parseControlOffset(offset: string): string | undefined {
-    switch (offset) {
-        case '-20':
-            return 'whisperOffer'
-        case '-21':
-            return 'listenRequest'
-        case '-22':
-            return 'listenAuthYes'
-        case '-23':
-            return 'listenAuthNo'
-        case '-24':
-            return 'joining'
-        case '-25':
-            return 'dropping'
-        case '-26':
-            return 'listenOffer'
-        case '-27':
-            return 'restart'
-        case '-40':
-            return 'requestReread'
-        default:
-            return undefined
-    }
-}
-
-function controlOffsetValue(offset: string): string | undefined {
-    switch (offset) {
-        case 'whisperOffer':
-            return '-20'
-        case 'listenRequest':
-            return '-21'
-        case 'listenAuthYes':
-            return '-22'
-        case 'listenAuthNo':
-            return '-23'
-        case 'joining':
-            return '-24'
-        case 'dropping':
-            return '-25'
-        case 'listenOffer':
-            return '-26'
-        case 'restart':
-            return '-27'
-        case 'requestReread':
-            return '-40'
-        default:
-            return undefined
-    }
-}
-
-function parseControlChunk(chunk: String) {
-    const parts = chunk.split('|')
-    const offset = parseControlOffset(parts[0])
-    if (parts.length != 7 || !offset) {
-        return undefined
-    }
-    const info: ClientInfo = {
-        offset,
-        conversationId: parts[1],
-        conversationName: parts[2],
-        clientId: parts[3],
-        profileId: parts[4],
-        username: parts[5],
-        contentId: parts[6],
-    }
-    return info
-}
-
-interface ContentChunk {
-    isDiff: boolean
-    offset: string | number
-    text: string
-}
-
-function parseContentChunk(chunk: String) {
-    const parts = chunk.match(/^(-?[0-9]+)\|(.*)$/)
-    if (!parts || parts.length != 3) {
-        return undefined
-    }
-    const offsetNum = parseInt(parts[1])
-    if (isNaN(offsetNum)) {
-        return undefined
-    }
-    const parsed: ContentChunk = {
-        isDiff: offsetNum >= -1,
-        offset: parseContentOffset(offsetNum) || offsetNum,
-        text: parts[2] || '',
-    }
-    return parsed
-}
-
-function parseContentOffset(offset: number) {
-    switch (offset) {
-        case -1:
-            return 'newline'
-        case -2:
-            return 'pastText'
-        case -3:
-            return 'liveText'
-        case -4:
-            return 'startReread'
-        case -6:
-            return 'clearHistory'
-        case -7:
-            return 'playSound'
-        case -8:
-            return 'playSpeech'
-        default:
-            return undefined
     }
 }
 

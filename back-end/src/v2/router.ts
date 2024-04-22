@@ -5,27 +5,32 @@
 import express from 'express'
 
 import {
-    pubSubTokenRequest,
-    listenTokenRequest,
-    userProfilePost,
-    userProfilePut,
-    whisperProfilePut,
-    whisperProfilePost,
-    whisperProfileGet,
-    userProfileGet,
+    listenProfileGet,
     listenProfilePost,
     listenProfilePut,
-    listenProfileGet,
-    postConversation, postUsername, settingsProfilePost, settingsProfilePut, settingsProfileGet,
+    listenTokenRequest,
+    postConversation,
+    postUsername,
+    pubSubTokenRequest,
+    settingsProfileGet,
+    settingsProfilePost,
+    settingsProfilePut,
+    userProfileGet,
+    userProfilePost,
+    userProfilePut,
+    whisperProfileGet,
+    whisperProfilePost,
+    whisperProfilePut,
 } from './routes.js'
 import { asyncWrapper, cookieMiddleware, sessionMiddleware } from '../middleware.js'
-import { apnsReceivedNotification, apnsToken } from '../routes.js'
+import { apnsReceivedNotification, apnsToken, logControlChunk } from '../routes.js'
 
 export const v2router = express.Router()
 
 v2router
     .post('/apnsToken', asyncWrapper(apnsToken))
     .post('/apnsReceivedNotification', asyncWrapper(apnsReceivedNotification))
+    .post('/logControlChunk', asyncWrapper(logControlChunk))
     .post('/userProfile', asyncWrapper(userProfilePost))
     .put('/userProfile/:profileId', asyncWrapper(userProfilePut))
     .get('/userProfile/:profileId', asyncWrapper(userProfileGet))

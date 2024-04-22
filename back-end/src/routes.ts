@@ -8,6 +8,7 @@ import { sendSecretToClient } from './apns.js'
 import { ClientData, hasClientChanged, setClientData } from './client.js'
 import { incrementErrorCounts } from './db.js'
 import { updateLaunchData } from './profile.js'
+import { parseControlChunk } from './protocol.js'
 
 const recentlyReceived: ClientData[] = []
 
@@ -78,5 +79,16 @@ export async function apnsReceivedNotification(req: express.Request, res: expres
     // see refreshSecret for details of this logic
     const received: ClientData = { id: clientId, secretDate: Date.now(), lastSecret: secretHex }
     await setClientData(received)
+    res.status(204).send()
+}
+
+export async function logControlChunk(req: express.Request, res: express.Response) {
+    const { clientId, kind, sentOrReceived, chunk } = req.body
+    const clientInfo = parseControlChunk(chunk)
+    if (clientInfo) {
+        console.log(`Client ${clientId} ${sentOrReceived} ${kind} chunk: ${JSON.stringify(clientInfo)}`)
+    } else {
+        console.error(`Received unknown log chunk: ${JSON.stringify(req.body)}`)
+    }
     res.status(204).send()
 }

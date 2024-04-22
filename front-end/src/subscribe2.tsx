@@ -68,6 +68,13 @@ function NameView(props: { confirm: (msg: string) => void }) {
         setName(e.target.value)
     }
 
+    function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+        if (e.key === 'Enter') {
+            e.preventDefault()
+            onConfirm()
+        }
+    }
+
     function onConfirm() {
         clientName = name
         Cookies.set('clientName', clientName, { expires: 365 })
@@ -100,6 +107,7 @@ function NameView(props: { confirm: (msg: string) => void }) {
                         style={{ width: '40ch' }}
                         value={name}
                         onChange={onChange}
+                        onKeyDown={onKeyDown}
                     />
                 </Grid>
                 <Grid item alignItems="stretch" style={{ display: 'flex' }}>

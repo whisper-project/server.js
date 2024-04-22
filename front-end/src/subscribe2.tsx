@@ -270,6 +270,9 @@ function receiveControlChunk(message: Ably.Types.Message,
         return
     }
     const info = parseControlChunk(message.data)
+    if (info) {
+        logControlChunk('received', message.data)
+    }
     switch (info?.offset) {
         case 'dropping':
             console.log(`Whisperer is dropping this client`)
@@ -286,6 +289,7 @@ function receiveControlChunk(message: Ably.Types.Message,
                 const offset = controlOffsetValue('joining')
                 const chunk = `${offset}|${conversationId}|${info.conversationName}|${clientId}|${clientId}|${clientName}|`
                 sendControlChunk(channel, info.clientId, chunk)
+                logControlChunk('sent', chunk)
                 setStatus(info.contentId)
             } else {
                 console.error(`Invalid content id: ${info.contentId}.  Please report a bug!`)
@@ -305,6 +309,7 @@ function receiveControlChunk(message: Ably.Types.Message,
             const offset = controlOffsetValue('listenRequest')
             const chunk = `${offset}|${conversationId}|${info.conversationName}|${clientId}|${clientId}|${clientName}|`
             sendControlChunk(channel, info.clientId, chunk)
+            logControlChunk('sent', chunk)
             break
         default:
             console.log(`Received unexpected control packet, resending listen offer: ${message.data}`)
@@ -390,6 +395,7 @@ function sendListenOffer(channel: Ably.Types.RealtimeChannelPromise) {
     console.log(`Sending listen offer`)
     let chunk = `${controlOffsetValue('listenOffer')}|${conversationId}||${clientId}|${clientId}||`
     sendControlChunk(channel, 'whisperer', chunk)
+    logControlChunk('sent', chunk)
 }
 
 function sendRereadText(channel: Ably.Types.RealtimeChannelPromise) {
@@ -402,6 +408,21 @@ function sendRereadText(channel: Ably.Types.RealtimeChannelPromise) {
     // request the whisperer to send all the text
     let chunk = `${controlOffsetValue('requestReread')}|live`
     sendControlChunk(channel, 'whisperer', chunk)
+}
+
+function logControlChunk(sentOrReceived: string, chunk: string) {
+    const url = window.location.origin + '/api/v2/logControlChunk'
+    fetch(url, {
+        method: 'POST',
+        mode: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            clientId: clientId,
+            sentOrReceived: sentOrReceived,
+            kind: 'TCP',
+            chunk: chunk,
+        }),
+    }).then(() => console.log(`Logged ${sentOrReceived} chunk: ${chunk}`))
 }
 
 function hookUnload(fn: () => void) {

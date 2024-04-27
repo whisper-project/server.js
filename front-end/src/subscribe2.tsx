@@ -34,7 +34,7 @@ const client = new Ably.Realtime.Promise({
     clientId: clientId,
     authUrl: '/api/v2/listenTokenRequest',
     echoMessages: false,
-    autoConnect: false,
+    autoConnect: false, // don't connect until we have a client name in cookie for use in auth
     // log: { level: 4 },
 })
 
@@ -51,8 +51,6 @@ export default function ListenerView() {
     } else if (exitMsg) {
         return <DisconnectedView message={exitMsg} />
     } else {
-        // don't connect until we have a client name
-        client.connect()
         return (
             <AblyProvider client={client}>
                 <ConnectView exit={(msg) => setExitMsg(msg)} />
@@ -78,6 +76,7 @@ function NameView(props: { confirm: (msg: string) => void }) {
     function onConfirm() {
         clientName = name
         Cookies.set('clientName', clientName, { expires: 365 })
+        client.connect()
         props.confirm(name)
     }
 
@@ -136,7 +135,7 @@ function DisconnectedView(props: { message: string }) {
 
 function ConnectView(props: { exit: (msg: string) => void }) {
     const [status, setStatus] = useState('waiting')
-    const { channel } = useChannel(
+    const { channel: channel } = useChannel(
         `${conversationId}:control`,
         m => receiveControlChunk(m, channel, setStatus, props.exit))
     const { updateStatus } = usePresence(`${conversationId}:control`, 'connect')
@@ -393,9 +392,19 @@ function sendDrop(channel: Ably.Types.RealtimeChannelPromise) {
 
 function sendListenOffer(channel: Ably.Types.RealtimeChannelPromise) {
     console.log(`Sending listen offer`)
-    let chunk = `${controlOffsetValue('listenOffer')}|${conversationId}||${clientId}|${clientId}||`
-    sendControlChunk(channel, 'whisperer', chunk)
-    logControlChunk('sent', chunk)
+    // turns out we can send before we're fully connected.  But if we do that, we don't
+    // hear the reply from the listener.  So make sure we're connected before we send.
+    function sendPacket() {
+        if (client.connection.state == 'connected') {
+            let chunk = `${controlOffsetValue('listenOffer')}|${conversationId}||${clientId}|${clientId}||`
+            sendControlChunk(channel, 'whisperer', chunk)
+            logControlChunk('sent', chunk)
+        } else {
+            setTimeout(sendPacket, 100)
+        }
+    }
+
+    sendPacket()
 }
 
 function sendRereadText(channel: Ably.Types.RealtimeChannelPromise) {

@@ -42,3 +42,16 @@ export async function incrementErrorCounts(data: object) {
         }
     }
 }
+
+export async function getPresenceLogging() {
+    const rc = await getDb()
+    const key = dbKeyPrefix + 'presenceLogging'
+    const val = await rc.get(key)
+    return val === 'true'
+}
+
+export async function setPresenceLogging(doLogging: boolean) {
+    const rc = await getDb()
+    const key = dbKeyPrefix + 'presenceLogging'
+    await rc.set(key, doLogging ? 'true' : 'false')
+}

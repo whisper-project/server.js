@@ -23,14 +23,15 @@ import {
     whisperProfilePut,
 } from './routes.js'
 import { asyncWrapper, cookieMiddleware, sessionMiddleware } from '../middleware.js'
-import { apnsReceivedNotification, apnsToken, logControlChunk } from '../routes.js'
+import { apnsReceivedNotification, apnsToken, logAnomaly, logPresenceChunk } from '../routes.js'
 
 export const v2router = express.Router()
 
 v2router
     .post('/apnsToken', asyncWrapper(apnsToken))
     .post('/apnsReceivedNotification', asyncWrapper(apnsReceivedNotification))
-    .post('/logControlChunk', asyncWrapper(logControlChunk))
+    .post('/logPresenceChunk', asyncWrapper(logPresenceChunk))
+    .post('/logAnomaly', asyncWrapper(logAnomaly))
     .post('/userProfile', asyncWrapper(userProfilePost))
     .put('/userProfile/:profileId', asyncWrapper(userProfilePut))
     .get('/userProfile/:profileId', asyncWrapper(userProfileGet))

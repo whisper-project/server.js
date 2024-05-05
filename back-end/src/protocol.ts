@@ -2,7 +2,7 @@
 // Licensed under the GNU Affero General Public License v3.
 // See the LICENSE file for details.
 
-interface ClientInfo {
+interface PresenceInfo {
     offset: string,
     conversationId: string,
     conversationName: string,
@@ -62,13 +62,13 @@ export function controlOffsetValue(offset: string): string | undefined {
     }
 }
 
-export function parseControlChunk(chunk: string) {
+export function parsePresenceChunk(chunk: string) {
     const parts = chunk.split('|')
     const offset = parseControlOffset(parts[0])
     if (parts.length != 7 || !offset) {
         return undefined
     }
-    const info: ClientInfo = {
+    const info: PresenceInfo = {
         offset,
         conversationId: parts[1],
         conversationName: parts[2],

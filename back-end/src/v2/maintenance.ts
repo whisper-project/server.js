@@ -2,10 +2,12 @@
 // Licensed under the GNU Affero General Public License v3.
 // See the LICENSE file for details.
 
-import { dbKeyPrefix, getDb } from '../db.js'
+import { dbKeyPrefix, getDb, setPresenceLogging } from '../db.js'
 import { getProfileClients, removeProfileClient } from '../profile.js'
 import { ClientData, getClientData } from '../client.js'
 import { loadSettings } from '../settings.js'
+
+const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000)
 
 async function getProfilesAndClients() {
     const rc = await getDb()
@@ -53,7 +55,7 @@ async function countUnusedProfiles(andDeleteThem: boolean = false) {
     }
 }
 
-async function countUnusedClients(unusedSince: number = Date.now() - (30 * 24 * 60 * 60 * 1000), andDeleteThem: boolean = false) {
+async function countUnusedClients(unusedSince: number = thirtyDaysAgo, andDeleteThem: boolean = false) {
     const clients = await getAllClients()
     const oldClientIds: string[] = []
     const oldClientKeys: string[] = []
@@ -78,13 +80,30 @@ async function countUnusedClients(unusedSince: number = Date.now() - (30 * 24 * 
     }
 }
 
-async function doMaintenance() {
+async function doMaintenance(chores: string[]) {
     loadSettings()
-    await countUnusedProfiles()
-    await countUnusedClients()
+    for (const chore of chores) {
+        if (chore.startsWith('logging-')) {
+            if (chore.endsWith('on')) {
+                await setPresenceLogging(true)
+            } else if (chore.endsWith('off')) {
+                await setPresenceLogging(false)
+            } else {
+                throw Error(`Unrecognized chore: ${chore}`)
+            }
+        } else if (chore == 'count-unused') {
+            await countUnusedClients()
+            await countUnusedProfiles()
+        } else if (chore == 'delete-unused') {
+            await countUnusedClients(thirtyDaysAgo, true)
+            await countUnusedProfiles(true)
+        } else {
+            throw Error(`Unrecognized chore: ${chore}`)
+        }
+    }
 }
 
-doMaintenance().then(() => {
+doMaintenance(process.argv.slice(2)).then(() => {
     console.log(`Maintenance complete`)
     process.exit(0)
 })

@@ -16,6 +16,7 @@ import {
     saveProfileData,
     setConversationInfo,
 } from '../profile.js'
+import { getPresenceLogging } from '../db.js'
 
 export async function pubSubTokenRequest(req: express.Request, res: express.Response) {
     const body: { [p: string]: string } = req.body
@@ -96,6 +97,7 @@ export async function listenToConversation(req: express.Request, res: express.Re
     setCookie('whispererName', profileData!.name!)
     setCookie('clientId', clientId)
     setCookie('clientName', req.cookies?.clientName || '')
+    setCookie('logPresenceChunks', await getPresenceLogging() ? 'yes' : '')
     const body = subscribe_response(info!.name, profileData!.name!)
     res.status(200).send(body)
 }

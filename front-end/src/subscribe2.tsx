@@ -4,7 +4,7 @@
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Cookies from 'js-cookie'
-import { AblyProvider, useChannel, usePresence } from 'ably/react'
+import { AblyProvider, ChannelResult, useChannel, usePresence } from 'ably/react'
 import * as Ably from 'ably'
 
 import Typography from '@mui/material/Typography'
@@ -18,13 +18,14 @@ import '@fontsource/roboto/400.css'
 import '@fontsource/roboto/500.css'
 import '@fontsource/roboto/700.css'
 // @ts-ignore
-import { controlOffsetValue, parseContentChunk, parseControlChunk } from '../../back-end/src/protocol.js'
+import { controlOffsetValue, parseContentChunk, parsePresenceChunk } from '../../back-end/src/protocol.js'
 
 const conversationId = Cookies.get('conversationId') || ''
 const conversationName = Cookies.get('conversationName') || ''
 const whispererName = Cookies.get('whispererName') || ''
 const clientId = Cookies.get('clientId') || ''
 let clientName = Cookies.get('clientName') || ''
+const logPresenceChunks = Cookies.get('logPresenceChunks') || ''
 
 if (!conversationId || !whispererName || !clientId || !conversationName) {
     window.location.href = '/subscribe404.html'
@@ -135,7 +136,7 @@ function DisconnectedView(props: { message: string }) {
 
 function ConnectView(props: { exit: (msg: string) => void }) {
     const [status, setStatus] = useState('waiting')
-    const { channel: channel } = useChannel(
+    const { channel }: ChannelResult = useChannel(
         `${conversationId}:control`,
         m => receiveControlChunk(m, channel, setStatus, props.exit))
     const { updateStatus } = usePresence(`${conversationId}:control`, 'connect')
@@ -146,8 +147,8 @@ function ConnectView(props: { exit: (msg: string) => void }) {
         sendDrop(channel)
         props.exit(msg)
     }
-    doCount(() => sendListenOffer(channel), 'initialOffer', 1)
     const rereadLiveText = () => sendRereadText(channel)
+    doCount(() => sendListenOffer(channel), 'initialOffer', 1)
     return (
         <Stack spacing={5}>
             <Typography variant="h4">Conversation “{conversationName}” with {whispererName}</Typography>
@@ -268,9 +269,9 @@ function receiveControlChunk(message: Ably.Types.Message,
         // ignoring message for another client
         return
     }
-    const info = parseControlChunk(message.data)
+    const info = parsePresenceChunk(message.data)
     if (info) {
-        logControlChunk('received', message.data)
+        logPresenceChunk('received', message.data)
     }
     switch (info?.offset) {
         case 'dropping':
@@ -288,7 +289,7 @@ function receiveControlChunk(message: Ably.Types.Message,
                 const offset = controlOffsetValue('joining')
                 const chunk = `${offset}|${conversationId}|${info.conversationName}|${clientId}|${clientId}|${clientName}|`
                 sendControlChunk(channel, info.clientId, chunk)
-                logControlChunk('sent', chunk)
+                logPresenceChunk('sent', chunk)
                 setStatus(info.contentId)
             } else {
                 console.error(`Invalid content id: ${info.contentId}.  Please report a bug!`)
@@ -308,7 +309,7 @@ function receiveControlChunk(message: Ably.Types.Message,
             const offset = controlOffsetValue('listenRequest')
             const chunk = `${offset}|${conversationId}|${info.conversationName}|${clientId}|${clientId}|${clientName}|`
             sendControlChunk(channel, info.clientId, chunk)
-            logControlChunk('sent', chunk)
+            logPresenceChunk('sent', chunk)
             break
         default:
             console.log(`Received unexpected control packet, resending listen offer: ${message.data}`)
@@ -395,16 +396,12 @@ function sendListenOffer(channel: Ably.Types.RealtimeChannelPromise) {
     // turns out we can send before we're fully connected.  But if we do that, we don't
     // hear the reply from the listener.  So make sure we're connected before we send.
     function sendPacket() {
-        if (client.connection.state == 'connected') {
-            let chunk = `${controlOffsetValue('listenOffer')}|${conversationId}||${clientId}|${clientId}||`
-            sendControlChunk(channel, 'whisperer', chunk)
-            logControlChunk('sent', chunk)
-        } else {
-            setTimeout(sendPacket, 100)
-        }
+        let chunk = `${controlOffsetValue('listenOffer')}|${conversationId}||${clientId}|${clientId}||`
+        sendControlChunk(channel, 'whisperer', chunk)
+        logPresenceChunk('sent', chunk)
     }
 
-    sendPacket()
+    channel.attach().then(sendPacket)
 }
 
 function sendRereadText(channel: Ably.Types.RealtimeChannelPromise) {
@@ -419,8 +416,11 @@ function sendRereadText(channel: Ably.Types.RealtimeChannelPromise) {
     sendControlChunk(channel, 'whisperer', chunk)
 }
 
-function logControlChunk(sentOrReceived: string, chunk: string) {
-    const url = window.location.origin + '/api/v2/logControlChunk'
+function logPresenceChunk(sentOrReceived: string, chunk: string) {
+    if (!logPresenceChunks) {
+        return
+    }
+    const url = window.location.origin + '/api/v2/logPresenceChunk'
     fetch(url, {
         method: 'POST',
         mode: 'same-origin',

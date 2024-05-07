@@ -32,17 +32,6 @@ export async function getSessionKeys(doRotate = false) {
     return stored
 }
 
-export async function incrementErrorCounts(data: object) {
-    const db = await getDb()
-    for (const field in ['dropped', 'tcp', 'authentication']) {
-        const prop = field + 'ErrorCount'
-        const val = data[prop]
-        if (val && typeof val === 'number') {
-            await db.hIncrBy(dbKeyPrefix + 'errorCounts', field, val)
-        }
-    }
-}
-
 export async function getPresenceLogging() {
     const rc = await getDb()
     const key = dbKeyPrefix + 'presenceLogging'

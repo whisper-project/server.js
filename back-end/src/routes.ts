@@ -6,9 +6,10 @@ import express from 'express'
 
 import { sendSecretToClient } from './apns.js'
 import { ClientData, hasClientChanged, isApnsPostRepeat, setClientData } from './client.js'
-import { getPresenceLogging, incrementErrorCounts } from './db.js'
+import { getPresenceLogging } from './db.js'
 import { updateLaunchData } from './profile.js'
 import { parsePresenceChunk } from './protocol.js'
+import { ChannelEvent } from './channelEvent.js'
 
 export async function apnsToken(req: express.Request, res: express.Response) {
     const body: { [p: string]: string } = req.body
@@ -44,7 +45,6 @@ export async function apnsToken(req: express.Request, res: express.Response) {
     }
     const { clientChanged, changeReason } = await hasClientChanged(clientId, received)
     await setClientData(received)
-    await incrementErrorCounts(body)
     if (clientChanged) {
         console.log(`Received ${changeReason} client ${clientId}${appInfo}`)
         res.status(201).send()
@@ -90,5 +90,11 @@ export async function logPresenceChunk(req: express.Request, res: express.Respon
 export async function logAnomaly(req: express.Request, res: express.Response) {
     const { clientId, kind, message } = req.body
     console.log(`Client ${clientId} reports ${kind} anomaly: ${message}`)
+    res.status(204).send()
+}
+
+export async function logChannelEvent(req: express.Request, res: express.Response) {
+    const info = req.body as unknown as ChannelEvent
+    console.log(JSON.stringify(info))
     res.status(204).send()
 }

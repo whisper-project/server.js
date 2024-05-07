@@ -5,12 +5,11 @@
 import express from 'express'
 
 import { sendSecretToClient } from './apns.js'
-import { ClientData, hasClientChanged, setClientData } from './client.js'
-import { incrementErrorCounts } from './db.js'
+import { ClientData, hasClientChanged, isApnsPostRepeat, setClientData } from './client.js'
+import { getPresenceLogging } from './db.js'
 import { updateLaunchData } from './profile.js'
-import { parseControlChunk } from './protocol.js'
-
-const recentlyReceived: ClientData[] = []
+import { parsePresenceChunk } from './protocol.js'
+import { ChannelEvent } from './channelEvent.js'
 
 export async function apnsToken(req: express.Request, res: express.Response) {
     const body: { [p: string]: string } = req.body
@@ -26,36 +25,26 @@ export async function apnsToken(req: express.Request, res: express.Response) {
     const received: ClientData = {
         id: clientId,
         token: tokenHex,
-        tokenDate: Date.now(),
         lastSecret: secretHex,
         userName: body?.userName || '',
         profileId: body?.profileId || '',
         appInfo: body?.appInfo || '',
         lastLaunch: Date.now(),
+        isPresenceLogging: body?.isPresenceLogging ? 1 : 0,
     }
     // we need to ignore duplicate, almost-simultaneous posts from the same client
     // see issue #2 for details of the problem
-    for (let i = 0; i < recentlyReceived.length;) {
-        const recent = recentlyReceived[i]
-        if (recent.tokenDate! + 250 < received.tokenDate!) {
-            recentlyReceived.splice(i, 1)
-        } else if (recent.id === received.id && recent.token === received.token) {
-            console.warn(`Ignoring duplicate APNs post from ${clientId}${appInfo}`)
-            res.setHeader('X-Received-Earlier', recent.tokenDate!.toString())
-            res.status(204).send()
-            return
-        } else {
-            i += 1
-        }
+    if (await isApnsPostRepeat(received)) {
+        console.warn(`Ignoring duplicate APNs post from ${clientId}${appInfo}`)
+        res.status(204).send()
+        return
     }
-    recentlyReceived.push(received)
     if (received.userName && received.profileId) {
         console.log(`Received profile ${received.profileId} (${received.userName}) at launch from client ${clientId}`)
         await updateLaunchData(received.id, received.profileId, received.userName)
     }
     const { clientChanged, changeReason } = await hasClientChanged(clientId, received)
     await setClientData(received)
-    await incrementErrorCounts(body)
     if (clientChanged) {
         console.log(`Received ${changeReason} client ${clientId}${appInfo}`)
         res.status(201).send()
@@ -82,13 +71,30 @@ export async function apnsReceivedNotification(req: express.Request, res: expres
     res.status(204).send()
 }
 
-export async function logControlChunk(req: express.Request, res: express.Response) {
+export async function logPresenceChunk(req: express.Request, res: express.Response) {
+    const doLogging = await getPresenceLogging()
+    if (!doLogging) {
+        res.status(201).send()
+        return
+    }
     const { clientId, kind, sentOrReceived, chunk } = req.body
-    const clientInfo = parseControlChunk(chunk)
+    const clientInfo = parsePresenceChunk(chunk)
     if (clientInfo) {
         console.log(`Client ${clientId} ${sentOrReceived} ${kind} chunk: ${JSON.stringify(clientInfo)}`)
     } else {
         console.error(`Received unknown log chunk: ${JSON.stringify(req.body)}`)
     }
+    res.status(204).send()
+}
+
+export async function logAnomaly(req: express.Request, res: express.Response) {
+    const { clientId, kind, message } = req.body
+    console.log(`Client ${clientId} reports ${kind} anomaly: ${message}`)
+    res.status(204).send()
+}
+
+export async function logChannelEvent(req: express.Request, res: express.Response) {
+    const info = req.body as unknown as ChannelEvent
+    console.log(JSON.stringify(info))
     res.status(204).send()
 }

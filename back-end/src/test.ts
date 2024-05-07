@@ -23,7 +23,6 @@ export async function createTestClient() {
     const clientData: ClientData = {
         id: uuid,
         token: await makeNonce(),
-        tokenDate: Date.now() - (2 * 24 * 60 * 60 * 1000),
         secret: await makeNonce(),
         lastSecret: await makeNonce(),
         secretDate: Date.now() - (2 * 24 * 60 * 60 * 1000) + 5 * 1000,

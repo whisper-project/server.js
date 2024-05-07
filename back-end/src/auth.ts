@@ -122,8 +122,8 @@ export async function refreshSecret(clientId: string, force: boolean = false) {
     // with the current secret, but the server allows use of the prior
     // secret as a one-time fallback when the client has gone out of sync.
     const clientData = await getClientData(clientId)
-    if (!clientData || !clientData?.token || !clientData?.tokenDate) {
-        throw Error(`Can't have a secret without a dated device token: ${clientId}`)
+    if (!clientData || !clientData?.token) {
+        throw Error(`Can't have a secret without a device token: ${clientId}`)
     }
     if (force || !clientData?.secret || !clientData?.secretDate) {
         if (clientData?.secret && !clientData?.secretDate) {

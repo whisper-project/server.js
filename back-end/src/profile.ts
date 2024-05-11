@@ -13,6 +13,7 @@ export interface ProfileData {
     whisperProfile?: string
     listenTimestamp?: string
     listenProfile?: string
+    settingsVersion?: number
     settingsETag?: string
     settingsProfile?: string
 }
@@ -24,7 +25,15 @@ export async function getProfileData(id: string) {
     if (!dbData?.id) {
         return undefined
     }
-    return { ...dbData } as unknown as ProfileData
+    if (dbData?.settingsVersion) {
+        return {
+            ...dbData,
+            id: id,
+            settingsVersion: parseInt(dbData.settingsVersion) || 1,
+        } as ProfileData
+    } else {
+        return { ...dbData, id: id } as ProfileData
+    }
 }
 
 export async function saveProfileData(profileData: ProfileData) {
@@ -83,7 +92,7 @@ export async function updateLaunchData(clientId: string, profileId: string, user
     }
     const existing = await getProfileData(profileId)
     // don't update the username on a shared profile (see #25)
-    if (!existing || !existing.password) {
+    if (!existing || !existing?.password) {
         const update: ProfileData = { id: profileId, name: username }
         await saveProfileData(update)
     }

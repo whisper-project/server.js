@@ -421,6 +421,7 @@ export async function settingsProfilePost(req: express.Request, res: express.Res
     console.log(`Successful POST of settings profile ${body.id} (${existingData?.name}, ${body.eTag}) from client ${clientId}`)
     const newData: ProfileData = {
         id: body.id,
+        settingsVersion: parseInt(body?.version) || 1,
         settingsETag: body.eTag,
         settingsProfile: JSON.stringify(body),
     }
@@ -449,9 +450,17 @@ export async function settingsProfilePut(req: express.Request, res: express.Resp
         return
     }
     if (!await validateProfileAuth(req, res, existingData.password)) return
-    console.log(`Successful PUT of settings profile ${profileId} (${existingData?.name}, ${body.eTag}) from client ${clientId}`)
+    const existingVersion = existingData?.settingsVersion || 1
+    const putVersion = parseInt(body?.version) || 1
+    if (putVersion < existingVersion) {
+        console.error(`Failed PUT of setting profile v${putVersion} for ${profileId} (${existingData?.name}) from client ${clientId}`)
+        res.status(409).send({ status: `error`, reason: `Settings profile is already at version ${existingVersion}` })
+        return
+    }
+    console.log(`Successful PUT of settings profile v${putVersion}, ${body.eTag} for ${profileId} (${existingData?.name}) from client ${clientId}`)
     const newData: ProfileData = {
         id: existingData.id,
+        settingsVersion: putVersion,
         settingsETag: body.eTag,
         settingsProfile: JSON.stringify(body),
     }
@@ -484,7 +493,7 @@ export async function settingsProfileGet(req: express.Request, res: express.Resp
     res.setHeader('ETag', `"${existingData.settingsETag}"`)
     const body = JSON.parse(existingData.settingsProfile)
     if (!body?.version) {
-        body.version = '1'
+        body.version = 1
     }
     res.status(200).send(body)
 }

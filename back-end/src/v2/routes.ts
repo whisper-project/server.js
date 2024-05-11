@@ -406,13 +406,13 @@ export async function listenProfileGet(req: express.Request, res: express.Respon
 
 export async function settingsProfilePost(req: express.Request, res: express.Response) {
     const clientId = req.header('X-Client-Id') || 'unknown-client'
-    const body: { [p: string]: string } = req.body
+    const body: { [p: string]: string | number } = req.body
     if (!body?.id || !body?.eTag) {
         console.log(`Settings profile POST from client ${clientId} is missing data`)
         res.status(400).send({ status: `error`, reason: `Invalid POST data` })
         return
     }
-    const existingData = await getProfileData(body.id)
+    const existingData = await getProfileData(body.id as string)
     if (existingData?.settingsProfile) {
         console.error(`Settings profile POST for already-shared ${body.id} (${existingData?.name}) from ${clientId}`)
         res.status(409).send({ status: `error`, reason: `Settings profile ${body.id} is already shared` })
@@ -420,9 +420,9 @@ export async function settingsProfilePost(req: express.Request, res: express.Res
     }
     console.log(`Successful POST of settings profile ${body.id} (${existingData?.name}, ${body.eTag}) from client ${clientId}`)
     const newData: ProfileData = {
-        id: body.id,
-        settingsVersion: parseInt(body?.version) || 1,
-        settingsETag: body.eTag,
+        id: body.id as string,
+        settingsVersion: body?.version as number || 1,
+        settingsETag: body.eTag as string,
         settingsProfile: JSON.stringify(body),
     }
     await saveProfileData(newData)
@@ -437,7 +437,7 @@ export async function settingsProfilePut(req: express.Request, res: express.Resp
         res.status(404).send({ status: `error`, reason: `Invalid Profile ID` })
         return
     }
-    const body: { [p: string]: string } = req.body
+    const body: { [p: string]: string | number } = req.body
     if (!body || !body?.eTag) {
         console.error(`Settings profile PUT from client ${clientId} is missing data`)
         res.status(400).send({ status: `error`, reason: `Invalid PUT data` })
@@ -451,7 +451,7 @@ export async function settingsProfilePut(req: express.Request, res: express.Resp
     }
     if (!await validateProfileAuth(req, res, existingData.password)) return
     const existingVersion = existingData?.settingsVersion || 1
-    const putVersion = parseInt(body?.version) || 1
+    const putVersion = body?.version as number || 1
     if (putVersion < existingVersion) {
         console.error(`Failed PUT of setting profile v${putVersion} for ${profileId} (${existingData?.name}) from client ${clientId}`)
         res.status(409).send({ status: `error`, reason: `Settings profile is already at version ${existingVersion}` })
@@ -461,7 +461,7 @@ export async function settingsProfilePut(req: express.Request, res: express.Resp
     const newData: ProfileData = {
         id: existingData.id,
         settingsVersion: putVersion,
-        settingsETag: body.eTag,
+        settingsETag: body.eTag as string,
         settingsProfile: JSON.stringify(body),
     }
     await saveProfileData(newData)

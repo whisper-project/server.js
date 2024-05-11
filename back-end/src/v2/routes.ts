@@ -483,5 +483,8 @@ export async function settingsProfileGet(req: express.Request, res: express.Resp
     console.log(`Successful GET of settings profile ${profileId} (${existingData?.name}, ${existingData.settingsETag}) from client ${clientId}`)
     res.setHeader('ETag', `"${existingData.settingsETag}"`)
     const body = JSON.parse(existingData.settingsProfile)
+    if (!body?.version) {
+        body.version = '1'
+    }
     res.status(200).send(body)
 }

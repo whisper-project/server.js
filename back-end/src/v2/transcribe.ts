@@ -188,7 +188,7 @@ async function transcribePackets(transcriptId: string, contentKey: string) {
             continue
         }
         if (chunk.offset === 'newline') {
-            transcription = transcription + liveText + '\n'
+            transcription = transcription + '\n' + liveText
             liveText = ''
         } else if (chunk.offset === 0) {
             liveText = chunk.text
@@ -207,7 +207,7 @@ async function transcribePackets(transcriptId: string, contentKey: string) {
         }
     }
     if (liveText) {
-        transcription = transcription + liveText + '\n'
+        transcription = transcription + '\n' + liveText
     }
     if (errCount == 0) {
         await rc?.del(contentKey)

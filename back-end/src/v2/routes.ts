@@ -53,7 +53,9 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
             await setConversationInfo(info)
             const update: ProfileData = { id: body.profileId, name: body.username }
             await saveProfileData(update)
-            await startTranscription(clientId, conversationId, body.contentId)
+            if (body?.transcribe === 'yes') {
+                await startTranscription(clientId, conversationId, body.contentId)
+            }
         } else {
             console.log(`Reauthenticating client ${clientId} to whisper to conversation ${conversationId}`)
         }

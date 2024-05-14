@@ -88,11 +88,13 @@ interface ContentChunk {
 
 export function parseContentChunk(chunk: string) {
     const parts = chunk.match(/^(-?[0-9]+)\|(.*)$/)
-    if (!parts || parts.length != 3) {
+    if (parts === null || parts.length != 3) {
+        console.warn(`Can't parse content chunk: ${chunk}`)
         return undefined
     }
     const offsetNum = parseInt(parts[1])
     if (isNaN(offsetNum)) {
+        console.warn(`Can't parse chunk offset: ${chunk}`)
         return undefined
     }
     const parsed: ContentChunk = {

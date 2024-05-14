@@ -6,8 +6,12 @@ import { dbKeyPrefix, getDb, setPresenceLogging } from '../db.js'
 import { getProfileClients, removeProfileClient } from '../profile.js'
 import { ClientData, getClientData } from '../client.js'
 import { loadSettings } from '../settings.js'
+import { getTranscriptsForConversation } from './transcribe.js'
 
-const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000)
+const oneDayMillis = 24 * 60 * 60 * 1000
+const oneDayAgo = Date.now() - oneDayMillis
+const thirtyDaysAgo = Date.now() - (30 * oneDayMillis)
+const sevenDaysAgo = Date.now() - (7 * oneDayMillis)
 
 async function getProfilesAndClients() {
     const rc = await getDb()
@@ -80,6 +84,29 @@ async function countUnusedClients(unusedSince: number = thirtyDaysAgo, andDelete
     }
 }
 
+async function showTranscripts(collectedBefore: number = Date.now()) {
+    const rc = await getDb()
+    const prefix = dbKeyPrefix + `con:`
+    const keys = await rc.keys(`${prefix}*`)
+    for (const key of keys) {
+        const id = key.substring(prefix.length)
+        const transcripts = await getTranscriptsForConversation(id)
+        let showHeading = true
+        for (const tr of transcripts) {
+            if (tr.startTime > collectedBefore) {
+                break
+            }
+            if (showHeading) {
+                console.log(`Transcripts for conversation: ${id}:`)
+                console.log(`------------------------------------`)
+                showHeading = false
+            }
+            console.log(`Start: ${new Date(tr.startTime)}, Duration: ${tr.duration! / 1000}:\n${tr.transcription}`)
+            console.log(`------------------------------------`)
+        }
+    }
+}
+
 async function doMaintenance(chores: string[]) {
     loadSettings()
     for (const chore of chores) {
@@ -97,6 +124,18 @@ async function doMaintenance(chores: string[]) {
         } else if (chore == 'delete-unused') {
             await countUnusedClients(thirtyDaysAgo, true)
             await countUnusedProfiles(true)
+        } else if (chore.startsWith('show-transcripts-')) {
+            if (chore.endsWith('all')) {
+                await showTranscripts()
+            } else if (chore.endsWith('1')) {
+                await showTranscripts(oneDayAgo)
+            } else if (chore.endsWith('7')) {
+                await showTranscripts(sevenDaysAgo)
+            } else if (chore.endsWith('30')) {
+                await showTranscripts(thirtyDaysAgo)
+            } else {
+                throw Error(`Unrecognized chore: ${chore}`)
+            }
         } else {
             throw Error(`Unrecognized chore: ${chore}`)
         }

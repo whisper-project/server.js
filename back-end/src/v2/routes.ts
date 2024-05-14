@@ -438,11 +438,16 @@ export async function settingsProfilePost(req: express.Request, res: express.Res
         res.status(409).send({ status: `error`, reason: `Settings profile ${body.id} is already shared` })
         return
     }
-    console.log(`Successful POST of settings profile ${body.id} (${existingData?.name}, ${body.eTag}) from client ${clientId}`)
+    const settingsVersion = body?.version as number || 1
+    const settingsETag = body.eTag as string
+    console.log(
+        `Successful POST of settings profile ${body.id} (${existingData?.name}, ` +
+        `v${settingsVersion}, ${settingsETag}) from client ${clientId}`,
+    )
     const newData: ProfileData = {
         id: body.id as string,
-        settingsVersion: body?.version as number || 1,
-        settingsETag: body.eTag as string,
+        settingsVersion,
+        settingsETag,
         settingsProfile: JSON.stringify(body),
     }
     await saveProfileData(newData)
@@ -473,11 +478,17 @@ export async function settingsProfilePut(req: express.Request, res: express.Resp
     const existingVersion = existingData?.settingsVersion || 1
     const putVersion = body?.version as number || 1
     if (putVersion < existingVersion) {
-        console.error(`Failed PUT of setting profile v${putVersion} for ${profileId} (${existingData?.name}) from client ${clientId}`)
+        console.error(
+            `Failed PUT of setting profile v${putVersion} ` +
+            `for ${profileId} (${existingData?.name}) from client ${clientId}`,
+        )
         res.status(409).send({ status: `error`, reason: `Settings profile is already at version ${existingVersion}` })
         return
     }
-    console.log(`Successful PUT of settings profile v${putVersion}, ${body.eTag} for ${profileId} (${existingData?.name}) from client ${clientId}`)
+    console.log(
+        `Successful PUT of settings profile v${putVersion}, ${body.eTag} ` +
+        `for ${profileId} (${existingData?.name}) from client ${clientId}`,
+    )
     const newData: ProfileData = {
         id: existingData.id,
         settingsVersion: putVersion,

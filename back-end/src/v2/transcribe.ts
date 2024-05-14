@@ -188,7 +188,11 @@ async function transcribePackets(transcriptId: string, contentKey: string) {
             continue
         }
         if (chunk.offset === 'newline') {
-            transcription = transcription + '\n' + liveText
+            if (transcription) {
+                transcription = transcription + '\n' + liveText
+            } else {
+                transcription = liveText
+            }
             liveText = ''
         } else if (chunk.offset === 0) {
             liveText = chunk.text

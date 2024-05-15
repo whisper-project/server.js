@@ -9,6 +9,7 @@ import { v2router } from './v2/router.js'
 import { subscribeToPublisher } from './v1/routes.js'
 import { listenToConversation } from './v2/routes.js'
 import { asyncWrapper, cookieMiddleware, sessionMiddleware } from './middleware.js'
+import { getTranscriptPage } from './v2/transcribe.js'
 
 const PORT = process.env.PORT || 5001
 
@@ -18,6 +19,7 @@ express()
     .use('/api/v2', v2router)
     .use('/api/v1', v1router)
     .use('/api', v1router)
+    .get('/transcript/:conversationId/:transcriptId', asyncWrapper(getTranscriptPage))
     .get('/subscribe/:publisherId', [cookieMiddleware, sessionMiddleware], asyncWrapper(subscribeToPublisher))
     .get('/listen/:conversationId', [cookieMiddleware, sessionMiddleware], asyncWrapper(listenToConversation))
     .get('/listen/:conversationId/*', [cookieMiddleware, sessionMiddleware], asyncWrapper(listenToConversation))

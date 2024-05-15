@@ -28,6 +28,11 @@ import { getSettings } from '../settings.js'
 import { dbKeyPrefix, getDb } from '../db.js'
 import { randomUUID } from 'crypto'
 import { parseContentChunk } from '../protocol.js'
+import express from 'express'
+import { transcriptResponse } from './templates.js'
+import { getConversationInfo } from '../profile.js'
+import { validateClientAuth } from '../auth.js'
+import { getClientData } from '../client.js'
 
 export interface TranscriptData {
     id: string,
@@ -53,6 +58,47 @@ export async function getTranscriptsForConversation(conversationId: string) {
         }
     }
     return transcripts.sort((a, b) => b.startTime - a.startTime)
+}
+
+export async function getTranscriptPage(req: express.Request, resp: express.Response) {
+    const tr = await getTranscript(req.params.transcriptId)
+    if (!tr) {
+        console.error(`Request for unknown transcript ${req.params.transcriptId}`)
+        resp.sendStatus(404)
+        return
+    }
+    if (req.params.conversationId !== tr.conversationId) {
+        console.error(`Request for transcript against non-matching conversation id`)
+        resp.sendStatus(404)
+        return
+    }
+    console.log(`Sending transcript ${tr.id} for conversation ${tr.conversationId}`)
+    const page = await transcriptResponse(tr)
+    resp.status(200).send(page)
+}
+
+export async function listTranscripts(req: express.Request, resp: express.Response) {
+    const { clientId, conversationId } = req.params
+    const con = await getConversationInfo(conversationId)
+    if (!con) {
+        console.error(`Request for transcripts for unknown conversation`)
+        resp.status(404).send({ status: 'error', reason: 'Not Found' })
+        return
+    }
+    const cli = await getClientData(clientId)
+    if (!clientId || cli?.profileId !== con.ownerId) {
+        console.error(`Request for transcripts for non-matching client and conversation`)
+        resp.status(404).send({ status: 'error', reason: 'Not Found' })
+    }
+    if (!await validateClientAuth(req, resp, clientId)) {
+        return
+    }
+    const trs = await getTranscriptsForConversation(req.params.conversationId)
+    console.log(`Returning info on ${trs.length} transcripts`)
+    const data = trs.map(tr => {
+        return { id: tr.id, startTime: tr.startTime, duration: tr.duration, length: tr.transcription!.length }
+    })
+    resp.status(200).send(data)
 }
 
 export async function startTranscription(clientId: string, conversationId: string, contentId: string) {

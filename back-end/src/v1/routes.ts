@@ -6,7 +6,7 @@ import express from 'express'
 import { randomUUID } from 'crypto'
 
 import { createAblyPublishTokenRequest, createAblySubscribeTokenRequest } from './auth.js'
-import { subscribe_response } from './templates.js'
+import { subscribeResponse } from './templates.js'
 import { ClientData, getClientData, setClientData } from '../client.js'
 import { validateClientAuth } from '../auth.js'
 
@@ -81,7 +81,7 @@ export async function subscribeToPublisher(req: express.Request, res: express.Re
     setCookie('publisherName', publisherName)
     setCookie('clientId', clientId)
     setCookie('clientName', req.cookies?.clientName || '')
-    const body = subscribe_response(publisherName)
+    const body = subscribeResponse(publisherName)
     res.status(200).send(body)
 }
 

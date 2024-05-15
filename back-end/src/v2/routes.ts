@@ -6,7 +6,7 @@ import express from 'express'
 import { randomUUID } from 'crypto'
 
 import { createAblyPublishTokenRequest, createAblySubscribeTokenRequest } from './auth.js'
-import { subscribe_response } from './templates.js'
+import { subscribeResponse } from './templates.js'
 import { validateClientAuth, validateProfileAuth } from '../auth.js'
 import {
     ConversationInfo,
@@ -118,7 +118,7 @@ export async function listenToConversation(req: express.Request, res: express.Re
     setCookie('clientId', clientId)
     setCookie('clientName', req.cookies?.clientName || '')
     setCookie('logPresenceChunks', await getPresenceLogging() ? 'yes' : '')
-    const body = subscribe_response(info!.name, profileData!.name!)
+    const body = subscribeResponse(info!.name, profileData!.name!)
     res.status(200).send(body)
 }
 

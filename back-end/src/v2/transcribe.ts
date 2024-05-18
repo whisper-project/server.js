@@ -53,8 +53,6 @@ export async function getTranscriptsForConversation(conversationId: string) {
         const tr = await getTranscript(id)
         if (tr) {
             transcripts.push(tr)
-        } else {
-            console.error(`Transcript ${id} for conversation ${conversationId} doesn't exist?`)
         }
     }
     return transcripts.sort((a, b) => b.startTime - a.startTime)

@@ -77,6 +77,24 @@ export async function getTranscriptPage(req: express.Request, resp: express.Resp
     resp.status(200).send(page)
 }
 
+export async function postTranscript(req: express.Request, resp: express.Response) {
+    const text = req.body.text
+    if (!text) {
+        resp.status(400).send('No "text" field in posted JSON data')
+    }
+    const tr: TranscriptData = {
+        id: randomUUID(),
+        conversationId: randomUUID().toUpperCase(),
+        startTime: Date.now(),
+        duration: 320000,
+        contentKey: randomUUID(),
+        transcription: text,
+        errCount: 0,
+    }
+    const page = await transcriptResponse(tr)
+    resp.status(200).send(page)
+}
+
 export async function listTranscripts(req: express.Request, resp: express.Response) {
     const { clientId, conversationId } = req.params
     const con = await getConversationInfo(conversationId)
@@ -228,12 +246,14 @@ async function transcribePackets(transcriptId: string, contentKey: string) {
     }
     for (let i = chunks.length - 1; i >= 0; i--) {
         const chunk = parseContentChunk(chunks[i])
-        if (!chunk || !chunk.isDiff) {
-            console.warn(`Skipping illegal content chunk: ${chunks[i]}`)
+        if (!chunk) {
+            console.warn(`Transcription: Skipping illegal content chunk: ${chunks[i]}`)
             errCount++
             continue
         }
-        if (chunk.offset === 'newline') {
+        if (chunk.offset === 'playSound') {
+            // don't put sounds in the transcription
+        } else if (chunk.offset === 'newline') {
             if (transcription) {
                 transcription = transcription + '\n' + liveText
             } else {
@@ -242,7 +262,7 @@ async function transcribePackets(transcriptId: string, contentKey: string) {
             liveText = ''
         } else if (chunk.offset === 0) {
             liveText = chunk.text
-        } else {
+        } else if (chunk.isDiff) {
             const offset = chunk.offset as number
             if (offset == liveText.length) {
                 liveText = liveText + chunk.text
@@ -250,10 +270,13 @@ async function transcribePackets(transcriptId: string, contentKey: string) {
                 liveText = liveText.substring(0, offset) + chunk.text
             } else {
                 const diff = offset - liveText.length
-                console.warn(`Chunk offset indicates ${diff} missing characters, using ?`)
+                console.warn(`Transcription: Chunk offset indicates ${diff} missing characters, using ?`)
                 errCount++
                 liveText = liveText + '?'.repeat(diff) + chunk.text
             }
+        } else {
+            console.warn(`Transcription: Skipping unexpected content chunk: ${chunks[i]}`)
+            errCount++
         }
     }
     if (liveText) {

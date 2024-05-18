@@ -4,6 +4,7 @@
 
 import { TranscriptData } from './transcribe.js'
 import { getConversationInfo } from '../profile.js'
+import { escape } from 'html-escaper'
 
 export function subscribeResponse(conversation_name: string, whisperer_name: string) {
     return `
@@ -66,29 +67,41 @@ export async function transcriptResponse(tr: TranscriptData) {
     <link rel="icon" type="image/png" sizes="16x16" href="/img/favicon-16x16.png">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto">
     <link rel="stylesheet" href="/css/transcript.css">
-    <title>Transcript of ${con!.name!}</title>
+    <title>Transcript of ${con?.name || 'Unknown Conversation'}</title>
 </head>
 <body>
 <div class="transcript">
-<h2>Transcript of ${con!.name!}</h2>
+<h2>Transcript of ${con?.name || 'Unknown Conversation'}</h2>
 <div class="duration">
     <p>Started at ${start}, lasted ${duration}</p>
 </div>
 `
     const lines = tr.transcription!.split('\n')
+    let inParagraph = false
     let emptyLineAbove = false
     for (const line of lines) {
         if (line === '') {
             if (emptyLineAbove) {
-                // collapse multiple empty lines together
+                // multiple empty lines are ignored
             } else {
-                html += `\n<p></p>`
+                if (inParagraph) {
+                    html += `</p>\n`
+                    inParagraph = false
+                }
                 emptyLineAbove = true
             }
         } else {
-            html += `\n<p>${line}</p>`
-            emptyLineAbove
+            if (inParagraph) {
+                html += `<br>\n` + escape(line)
+            } else {
+                html += `\n<p>${line}`
+            }
+            inParagraph = true
+            emptyLineAbove = false
         }
+    }
+    if (inParagraph) {
+        html += `</p>\n`
     }
     html += `
 </body>

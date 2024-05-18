@@ -9,11 +9,11 @@ import { v2router } from './v2/router.js'
 import { subscribeToPublisher } from './v1/routes.js'
 import { listenToConversation } from './v2/routes.js'
 import { asyncWrapper, cookieMiddleware, sessionMiddleware } from './middleware.js'
-import { getTranscriptPage } from './v2/transcribe.js'
+import { getTranscriptPage, postTranscript } from './v2/transcribe.js'
 
 const PORT = process.env.PORT || 5001
 
-express()
+const release = express()
     .use(express.json())
     .use(express.static('public'))
     .use('/api/v2', v2router)
@@ -23,4 +23,14 @@ express()
     .get('/subscribe/:publisherId', [cookieMiddleware, sessionMiddleware], asyncWrapper(subscribeToPublisher))
     .get('/listen/:conversationId', [cookieMiddleware, sessionMiddleware], asyncWrapper(listenToConversation))
     .get('/listen/:conversationId/*', [cookieMiddleware, sessionMiddleware], asyncWrapper(listenToConversation))
-    .listen(PORT, () => console.log(`Listening on port ${PORT}`))
+
+const debug = release
+    .post('/test/transcript', asyncWrapper(postTranscript))
+
+if (process.env.NODE_ENV === 'production') {
+    release
+        .listen(PORT, () => console.log(`Listening (RELEASE) on port ${PORT}`))
+} else {
+    debug
+        .listen(PORT, () => console.log(`Listening (DEBUG) on port ${PORT}`))
+}

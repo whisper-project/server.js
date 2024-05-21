@@ -13,6 +13,7 @@ A transcription of a conversation is a hash with these fields:
 - contentKey - a key to a list containing the content chunks in reverse-chronological order
 - transcription - a string containing the transcription of the chunks
 - errCount - a count of transcription errors due to missing or corrupt chunks
+- ttl - the time to live for the transcript (seconds, defaults to 1 week)
 
 The transcription and errCount fields are not filled until the conversation is over
 and the packets are transcribed.  At that point, if there are no errors, the saved
@@ -34,6 +35,8 @@ import { getConversationInfo } from '../profile.js'
 import { validateClientAuth } from '../auth.js'
 import { getClientData } from '../client.js'
 
+const defaultTranscriptTtl = 24 * 60 * 60
+
 export interface TranscriptData {
     id: string,
     conversationId: string,
@@ -42,18 +45,29 @@ export interface TranscriptData {
     contentKey: string,
     transcription?: string,
     errCount?: number,
+    ttl?: number,
 }
 
 export async function getTranscriptsForConversation(conversationId: string) {
     const rc = await getDb()
     const key = dbKeyPrefix + 'cts:' + conversationId
     const ids = await rc.lRange(key, 0, -1)
+    const liveKeys: string[] = []
     const transcripts: TranscriptData[] = []
     for (const id of ids) {
         const tr = await getTranscript(id)
         if (tr) {
             transcripts.push(tr)
+            liveKeys.push(id)
         }
+    }
+    if (liveKeys.length == 0) {
+        await rc.del(key)
+    } else {
+        await rc.multi()
+            .del(key)
+            .rPush(key, liveKeys)
+            .exec()
     }
     return transcripts.sort((a, b) => b.startTime - a.startTime)
 }
@@ -170,18 +184,21 @@ async function endTranscription(data: TranscriptData) {
         await addTranscriptToConversation(data)
     } else {
         console.warn(`Discarding empty transcript for conversation ${data.conversationId}`)
-        await deleteTranscript(data.id)
+        await deleteTranscript(data)
     }
 }
 
-async function createTranscript(conversationId: string) {
+async function createTranscript(conversationId: string, ttl: number | undefined = undefined) {
     const id: string = randomUUID()
-    const contentPacketKey = dbKeyPrefix + 'tcp:' + randomUUID()
+    const contentKey = dbKeyPrefix + 'tcp:' + randomUUID()
     const data: TranscriptData = {
         id,
         conversationId,
         startTime: Date.now(),
-        contentKey: contentPacketKey,
+        contentKey: contentKey,
+    }
+    if (typeof ttl === 'number' && ttl > 0) {
+        data.ttl = ttl
     }
     await saveTranscript(data)
     return data
@@ -203,14 +220,18 @@ async function getTranscript(transcriptId: string) {
     return data as unknown as TranscriptData
 }
 
-async function saveTranscript(data: TranscriptData) {
+export async function saveTranscript(data: TranscriptData) {
     const rc = await getDb()
     const tKey = dbKeyPrefix + 'tra:' + data.id
+    const ttl = data?.ttl || defaultTranscriptTtl
     const newData: { [k: string]: string } = {
         id: data.id,
         conversationId: data.conversationId,
         startTime: data.startTime.toString(),
-        contentPacketKey: data.contentKey,
+        contentKey: data.contentKey,
+    }
+    if (data?.ttl) {
+        newData.ttl = ttl.toString()
     }
     if (typeof data?.duration === 'number') {
         newData.duration = data.duration.toString()
@@ -219,12 +240,15 @@ async function saveTranscript(data: TranscriptData) {
         newData.transcription = data.transcription
     }
     await rc.hSet(tKey, newData)
+    await rc.expire(data.contentKey, ttl)
+    await rc.expire(tKey, ttl)
 }
 
-async function deleteTranscript(transcriptId: string) {
+async function deleteTranscript(tr: TranscriptData) {
     const rc = await getDb()
-    const tKey = dbKeyPrefix + 'tra:' + transcriptId
-    await rc.del(tKey)
+    const cKey = tr.contentKey
+    const tKey = dbKeyPrefix + 'tra:' + tr.id
+    await rc.del([tKey, cKey])
 }
 
 async function addTranscriptToConversation(data: TranscriptData) {

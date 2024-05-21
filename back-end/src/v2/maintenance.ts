@@ -6,9 +6,10 @@ import { dbKeyPrefix, getDb, setPresenceLogging } from '../db.js'
 import { getProfileClients, removeProfileClient } from '../profile.js'
 import { ClientData, getClientData } from '../client.js'
 import { loadSettings } from '../settings.js'
-import { getTranscriptsForConversation } from './transcribe.js'
+import { getTranscriptsForConversation, saveTranscript } from './transcribe.js'
 
 const oneDayMillis = 24 * 60 * 60 * 1000
+const oneDaySeconds = 24 * 60 * 60
 const oneDayAgo = Date.now() - oneDayMillis
 const thirtyDaysAgo = Date.now() - (30 * oneDayMillis)
 const sevenDaysAgo = Date.now() - (7 * oneDayMillis)
@@ -107,6 +108,31 @@ async function showTranscripts(collectedBefore: number = Date.now()) {
     }
 }
 
+async function ensureTranscriptExpiration(seconds: number = 7 * oneDaySeconds) {
+    const rc = await getDb()
+    const prefix = dbKeyPrefix + `con:`
+    const keys = await rc.keys(`${prefix}*`)
+    for (const key of keys) {
+        const id = key.substring(prefix.length)
+        const transcripts = await getTranscriptsForConversation(id)
+        for (const tr of transcripts) {
+            if (tr['contentPacketKey']) {
+                if (!tr['contentKey']) {
+                    tr.contentKey = tr['contentPacketKey']
+                }
+                delete tr['contentPacketKey']
+            }
+            if (typeof tr?.ttl === 'number') {
+                console.log(`Transcript ${tr.id} of conversation ${tr.conversationId} already has TTL of ${seconds}sec`)
+            } else {
+                tr.ttl = seconds
+                await saveTranscript(tr)
+                console.log(`Transcript ${tr.id} of conversation ${tr.conversationId} now has TTL of ${seconds}sec`)
+            }
+        }
+    }
+}
+
 async function doMaintenance(chores: string[]) {
     loadSettings()
     for (const chore of chores) {
@@ -136,6 +162,8 @@ async function doMaintenance(chores: string[]) {
             } else {
                 throw Error(`Unrecognized chore: ${chore}`)
             }
+        } else if (chore === 'ensure-transcript-expiration') {
+            await ensureTranscriptExpiration()
         } else {
             throw Error(`Unrecognized chore: ${chore}`)
         }

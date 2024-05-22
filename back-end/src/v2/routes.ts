@@ -57,7 +57,7 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
                 await startTranscription(clientId, conversationId, body.contentId)
             }
         } else {
-            console.log(`Reauthenticating client ${clientId} to whisper to conversation ${conversationId}`)
+            console.log(`Reauthenticating client ${clientId} to whisper to conversation ${conversationId} (${body.conversationName}`)
         }
         const tokenRequest = await createAblyPublishTokenRequest(clientId, conversationId, body.contentId)
         res.status(200).send({ status: 'success', tokenRequest: JSON.stringify(tokenRequest) })
@@ -70,7 +70,7 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
                 `is looking for conversation ${conversationId} (${body.conversationName}) ` +
                 `with client ${clientId}`)
         } else {
-            console.log(`Reauthenticating client ${clientId} to listen to conversation ${conversationId}`)
+            console.log(`Reauthenticating client ${clientId} to listen to conversation ${conversationId} (${body.conversationName})`)
         }
         const tokenRequest = await createAblySubscribeTokenRequest(clientId, conversationId)
         res.status(200).send({ status: 'success', tokenRequest: JSON.stringify(tokenRequest) })

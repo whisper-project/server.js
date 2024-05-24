@@ -9,10 +9,9 @@ import { loadSettings } from '../settings.js'
 import { getTranscriptsForConversation, saveTranscript } from './transcribe.js'
 
 const oneDayMillis = 24 * 60 * 60 * 1000
-const oneDaySeconds = 24 * 60 * 60
 const oneDayAgo = Date.now() - oneDayMillis
-const thirtyDaysAgo = Date.now() - (30 * oneDayMillis)
-const sevenDaysAgo = Date.now() - (7 * oneDayMillis)
+const thirtyDaysAgo = Date.now() - 30 * oneDayMillis
+const sevenDaysAgo = Date.now() - 7 * oneDayMillis
 
 async function getProfilesAndClients() {
     const rc = await getDb()
@@ -60,7 +59,10 @@ async function countUnusedProfiles(andDeleteThem: boolean = false) {
     }
 }
 
-async function countUnusedClients(unusedSince: number = thirtyDaysAgo, andDeleteThem: boolean = false) {
+async function countUnusedClients(
+    unusedSince: number = thirtyDaysAgo,
+    andDeleteThem: boolean = false,
+) {
     const clients = await getAllClients()
     const oldClientIds: string[] = []
     const oldClientKeys: string[] = []
@@ -102,13 +104,15 @@ async function showTranscripts(collectedBefore: number = Date.now()) {
                 console.log(`------------------------------------`)
                 showHeading = false
             }
-            console.log(`Start: ${new Date(tr.startTime)}, Duration: ${tr.duration! / 1000}:\n${tr.transcription}`)
+            console.log(
+                `Start: ${new Date(tr.startTime)}, Duration: ${tr.duration! / 1000}:\n${tr.transcription}`,
+            )
             console.log(`------------------------------------`)
         }
     }
 }
 
-async function ensureTranscriptExpiration(seconds: number = 7 * oneDaySeconds) {
+async function migrateLegacyTranscripts() {
     const rc = await getDb()
     const prefix = dbKeyPrefix + `con:`
     const keys = await rc.keys(`${prefix}*`)
@@ -116,18 +120,33 @@ async function ensureTranscriptExpiration(seconds: number = 7 * oneDaySeconds) {
         const id = key.substring(prefix.length)
         const transcripts = await getTranscriptsForConversation(id)
         for (const tr of transcripts) {
-            if (tr['contentPacketKey']) {
-                if (!tr['contentKey']) {
+            let needsMigration = false
+            if (!tr['contentKey']) {
+                needsMigration = true
+                if (tr['contentPacketKey']) {
                     tr.contentKey = tr['contentPacketKey']
+                    delete tr['contentPacketKey']
+                } else {
+                    console.warn(`Transcript ${tr.id} is missing a contentKey, adding one.`)
+                    tr.contentKey = dbKeyPrefix + 'tcp:' + 'legacy-missing'
                 }
-                delete tr['contentPacketKey']
             }
-            if (typeof tr?.ttl === 'number') {
-                console.log(`Transcript ${tr.id} of conversation ${tr.conversationId} already has TTL of ${seconds}sec`)
-            } else {
-                tr.ttl = seconds
+            if (!tr?.clientId) {
+                needsMigration = true
+                console.warn(`Transcript ${tr.id} is missing a clientId, adding one.`)
+                tr.clientId = 'legacy-missing'
+            }
+            if (!tr?.contentId) {
+                needsMigration = true
+                console.warn(`Transcript ${tr.id} is missing a contentId, adding one.`)
+                tr.contentId = 'legacy-missing'
+            }
+            const tKey = dbKeyPrefix + 'tra:' + tr.id
+            if ((await rc.ttl(tKey)) < 0 || (await rc.ttl(tr.contentKey)) < 0) {
+                needsMigration = true
+            }
+            if (needsMigration) {
                 await saveTranscript(tr)
-                console.log(`Transcript ${tr.id} of conversation ${tr.conversationId} now has TTL of ${seconds}sec`)
             }
         }
     }
@@ -162,8 +181,8 @@ async function doMaintenance(chores: string[]) {
             } else {
                 throw Error(`Unrecognized chore: ${chore}`)
             }
-        } else if (chore === 'ensure-transcript-expiration') {
-            await ensureTranscriptExpiration()
+        } else if (chore === 'migrate-legacy-transcripts') {
+            await migrateLegacyTranscripts()
         } else {
             throw Error(`Unrecognized chore: ${chore}`)
         }

@@ -275,7 +275,6 @@ async function suspendTranscription(tr: TranscriptData, ably: Ably.Realtime) {
     await control.presence.leave('transcription')
     control.presence.unsubscribe()
     await control.detach()
-    ably.close()
 }
 
 async function endTranscription(tr: TranscriptData) {

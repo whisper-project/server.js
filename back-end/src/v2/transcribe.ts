@@ -40,6 +40,13 @@ so as long as any server is running the transcript will be picked up by some
 server as soon as it's queued. When a server is shut down in an orderly fashion,
 it queues its running transcripts for another server to find.
 
+In order to not miss chunks in the transition from one server to the next, the
+suspending server (that's shutting down) has to overlap with the resuming server
+(that's taking over).  In this overlap period, we save not only the text of the
+chunk but the ID of the packet carrying the chunk.  This way, the transcription
+process can eliminate the duplicate chunks (if there were any during the
+transition).
+
  */
 
 import * as Ably from 'ably/promises.js'
@@ -58,7 +65,10 @@ const globalTranscriptQueueKey = 'suspended-transcript-ids'
 const globalServerQueueKey = 'servers-doing-transcription'
 const myServerId = randomUUID()
 const localTranscriptQueue: (() => Promise<void>)[] = []
-let shutdownInProgress = false
+
+// global transcription suspend/resume overlap parameters
+let suspendInProgress = false
+const transcriptOverlapMs = 5000
 
 export interface TranscriptData {
     id: string
@@ -142,7 +152,7 @@ export async function listTranscripts(req: express.Request, resp: express.Respon
 
 export async function suspendTranscriptions(transcriber: Promise<void>) {
     // stop accepting new transcripts
-    shutdownInProgress = true
+    suspendInProgress = true
     await unblockDbClient('blocking')
     await transcriber
     // if we have no transcripts in progress, we're done
@@ -160,10 +170,12 @@ export async function suspendTranscriptions(transcriber: Promise<void>) {
         console.warn(`No server available to resume our transcripts, suspending anyway`)
     }
     console.log(`Suspending ${localTranscriptQueue.length} local transcripts...`)
+    const promises: Promise<void>[] = []
     for (let fn = localTranscriptQueue.pop(); fn; fn = localTranscriptQueue.pop()) {
-        await fn()
+        promises.push(fn())
     }
-    return
+    await Promise.all(promises)
+    console.log(`Local transcription stopped cleanly`)
 }
 
 export async function resumeTranscriptions() {
@@ -187,7 +199,7 @@ export async function resumeTranscriptions() {
             console.log(`Resume transcription ${tr.id} for conversation ${tr.conversationId}`)
             await startLocalTranscript(tr)
         }
-    } while (!shutdownInProgress)
+    } while (!suspendInProgress)
     console.log(`Server id ${myServerId} is no longer available to transcribe`)
     await rc.lRem(sKey, 0, myServerId)
 }
@@ -219,9 +231,17 @@ async function startLocalTranscript(tr: TranscriptData) {
 async function subscribeTranscriptContent(tr: TranscriptData, ably: Ably.Realtime) {
     const rc = await getDbClient()
     const content = ably.channels.get(`${tr.conversationId}:${tr.contentId}`)
+    const cKey = tr.contentKey
+    let saveIds = true
     await content.subscribe('all', (message) => {
-        rc.lPush(tr.contentKey, message.data).then()
+        if (saveIds || suspendInProgress) {
+            rc.multi().lPush(cKey, `id:${message.id}`).lPush(cKey, message.data).exec().then()
+        } else {
+            rc.lPush(tr.contentKey, message.data).then()
+        }
     })
+    // only save IDs for the first few seconds of transcription (overlap with prior server)
+    setTimeout(() => (saveIds = false), transcriptOverlapMs)
     console.log(`Subscribed to ${tr.conversationId}:${tr.contentId}`)
 }
 
@@ -268,9 +288,10 @@ async function suspendTranscription(tr: TranscriptData, ably: Ably.Realtime) {
     const rc = await getDbClient()
     const key = dbKeyPrefix + globalTranscriptQueueKey
     await rc.lPush(key, tr.id)
-    // then stop listening
+    // give the other server some time to get connected, then stop listening
     const content = ably.channels.get(`${tr.conversationId}:${tr.contentId}`)
     const control = ably.channels.get(`${tr.conversationId}:control`)
+    await new Promise((resolve) => setTimeout(resolve, transcriptOverlapMs))
     await content.detach()
     await control.presence.leave('transcription')
     control.presence.unsubscribe()
@@ -378,10 +399,26 @@ async function transcribePackets(transcriptId: string, contentKey: string) {
     let transcription = ''
     let errCount = 0
     const chunks = await rc.lRange(contentKey, 0, -1)
+    let ids: string[] = []
     if (chunks.length == 0) {
         console.warn(`No packets in transcript ${transcriptId} to transcribe`)
     }
     for (let i = chunks.length - 1; i >= 0; i--) {
+        if (chunks[i].startsWith('id:')) {
+            // this is an ID marker for the next chunk
+            if (ids.includes(chunks[i])) {
+                // we have already seen this chunk, discard it
+                i--
+                continue
+            } else {
+                // this is the first time we are seeing this chunk, process it
+                ids.push(chunks[i])
+                i--
+            }
+        } else {
+            // no ID for this chunk, so no future chunks can be duplicates
+            ids = []
+        }
         const chunk = parseContentChunk(chunks[i])
         if (!chunk) {
             console.warn(`Transcription: Skipping illegal content chunk: ${chunks[i]}`)

@@ -68,6 +68,10 @@ function shutdown(signal: string, transcriber: Promise<void>, server: Server | u
     let exitStatus = 0
     console.warn(`Shutting down due to ${signal}...`)
     const suspend = suspendTranscriptions(transcriber)
+    const notifyAndExit = () => {
+        console.log(`Terminating server process after shutdown`)
+        process.exit(exitStatus)
+    }
     if (server) {
         server.close((err) => {
             if (err) {
@@ -76,10 +80,10 @@ function shutdown(signal: string, transcriber: Promise<void>, server: Server | u
             } else {
                 console.log(`The webserver stopped cleanly.`)
             }
-            suspend.then(() => process.exit(exitStatus))
+            suspend.then(notifyAndExit)
         })
     } else {
-        suspend.then(() => process.exit(exitStatus))
+        suspend.then(notifyAndExit)
     }
 }
 

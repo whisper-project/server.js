@@ -321,6 +321,7 @@ async function createTranscript(
     contentId: string,
     ttl: number | undefined = undefined,
 ) {
+    await getDbClient() // required to get the correct dbKeyPrefix
     const id: string = randomUUID()
     const contentKey = dbKeyPrefix + 'tcp:' + randomUUID()
     const tr: TranscriptData = {

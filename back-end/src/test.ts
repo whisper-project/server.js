@@ -7,8 +7,14 @@ import assert from 'assert'
 import express from 'express'
 import { fetch } from 'fetch-h2'
 
-import { createApnsJwt, createClientJwt, makeNonce, validateApnsJwt, validateClientJwt } from './auth.js'
-import { getDb } from './db.js'
+import {
+    createApnsJwt,
+    createClientJwt,
+    makeNonce,
+    validateApnsJwt,
+    validateClientJwt,
+} from './auth.js'
+import { getDbClient } from './db.js'
 import { loadSettings } from './settings.js'
 import { ClientData, getClientData, setClientData } from './client.js'
 import { getApnsRequestData } from './apns.js'
@@ -25,7 +31,7 @@ export async function createTestClient() {
         token: await makeNonce(),
         secret: await makeNonce(),
         lastSecret: await makeNonce(),
-        secretDate: Date.now() - (2 * 24 * 60 * 60 * 1000) + 5 * 1000,
+        secretDate: Date.now() - 2 * 24 * 60 * 60 * 1000 + 5 * 1000,
     }
     await setClientData(clientData)
     return uuid
@@ -43,7 +49,7 @@ async function testJwt() {
     console.log('Client2 JWT:', jwt2)
     assert(await validateClientJwt(jwt1, client1), `Failed to validate Client1 jwt`)
     assert(await validateClientJwt(jwt2, client2), `Failed to validate Client2 jwt`)
-    assert(!await validateClientJwt(jwt1, client2), `Validated Client1 jwt as Client2`)
+    assert(!(await validateClientJwt(jwt1, client2)), `Validated Client1 jwt as Client2`)
 }
 
 async function testApns() {
@@ -68,7 +74,7 @@ async function testApns() {
     assert(response1.status === 204, `Non-204 status from post of APNS token`)
     assert(response2.status === 204, `Non-204 status from post of APNS token`)
     assert(response2.headers.get('X-Received-Earlier'), `Second call wasn't caught as a duplicate`)
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await new Promise((resolve) => setTimeout(resolve, 1000))
     clientData = await getClientData(clientId)
     assert(clientData && clientData.pushId, `pushId wasn't recorded on client during update`)
     const requestId = `req:${clientData.pushId}`
@@ -85,7 +91,7 @@ async function mockApnsRoute(req: express.Request, res: express.Response) {
         return
     }
     const jwt = auth.substring(7)
-    if (!await validateApnsJwt(jwt)) {
+    if (!(await validateApnsJwt(jwt))) {
         res.status(403).send({ status: 'error', reason: 'Invalid jwt' })
         return
     }
@@ -100,7 +106,7 @@ async function mockApnsRoute(req: express.Request, res: express.Response) {
 }
 
 async function deleteTestKeys() {
-    const rc = await getDb()
+    const rc = await getDbClient()
     const keys = await rc.keys('t:*')
     if (keys.length) {
         await rc.del(keys)
@@ -132,7 +138,7 @@ testAll(...process.argv.slice(2))
         console.log('Tests completed with no errors')
         process.exit(0)
     })
-    .catch(reason => {
+    .catch((reason) => {
         console.error(`Tests failed: ${reason}`)
         process.exit(1)
     })

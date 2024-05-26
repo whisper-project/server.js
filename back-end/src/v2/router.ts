@@ -24,6 +24,7 @@ import {
 } from './routes.js'
 import { asyncWrapper, cookieMiddleware, sessionMiddleware } from '../middleware.js'
 import { apnsReceivedNotification, apnsToken, logAnomaly, logChannelEvent, logPresenceChunk } from '../routes.js'
+import { listTranscripts } from './transcribe.js'
 
 export const v2router = express.Router()
 
@@ -49,3 +50,4 @@ v2router
     .post('/username', asyncWrapper(postUsername))
     .post('/pubSubTokenRequest', asyncWrapper(pubSubTokenRequest))
     .get('/listenTokenRequest', [cookieMiddleware, sessionMiddleware], asyncWrapper(listenTokenRequest))
+    .get('/listTranscripts/:clientId/:conversationId', asyncWrapper(listTranscripts))

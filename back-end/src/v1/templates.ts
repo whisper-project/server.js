@@ -2,7 +2,7 @@
 // Licensed under the GNU Affero General Public License v3.
 // See the LICENSE file for details.
 
-export function subscribe_response(publisher_name: string) {
+export function subscribeResponse(publisher_name: string) {
     return `
 <!DOCTYPE html>
 <html lang="en">

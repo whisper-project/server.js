@@ -31,6 +31,8 @@ if (!conversationId || !whispererName || !clientId || !conversationName) {
     window.location.href = '/subscribe404.html'
 }
 
+const player = new Audio()
+
 const client = new Ably.Realtime.Promise({
     clientId: clientId,
     authUrl: '/api/v2/listenTokenRequest',
@@ -333,7 +335,10 @@ function receiveContentChunk(message: Ably.Types.Message,
         console.error(`Ignoring invalid content chunk: ${message.data as string}`)
         return
     }
-    if (chunk.isDiff) {
+    if (chunk.offset === 'playSound') {
+        player.src = `/snd/${chunk.text}.mp3`
+        player.play()
+    } else if (chunk.isDiff) {
         // sometimes we lose the end of resets, so if we get a diff assume it's completed.
         resetInProgress = false
         if (chunk.offset === 0) {

@@ -2,15 +2,19 @@
 // Licensed under the GNU Affero General Public License v3.
 // See the LICENSE file for details.
 
-import { dbKeyPrefix, getDb, setPresenceLogging } from '../db.js'
+import { dbKeyPrefix, getDbClient, setPresenceLogging } from '../db.js'
 import { getProfileClients, removeProfileClient } from '../profile.js'
 import { ClientData, getClientData } from '../client.js'
 import { loadSettings } from '../settings.js'
+import { getTranscriptsForConversation, saveTranscript } from './transcribe.js'
 
-const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000)
+const oneDayMillis = 24 * 60 * 60 * 1000
+const oneDayAgo = Date.now() - oneDayMillis
+const thirtyDaysAgo = Date.now() - 30 * oneDayMillis
+const sevenDaysAgo = Date.now() - 7 * oneDayMillis
 
 async function getProfilesAndClients() {
-    const rc = await getDb()
+    const rc = await getDbClient()
     const keys = await rc.keys(dbKeyPrefix + 'pro:*')
     const profileClients: { [k: string]: string[] } = {}
     for (const key of keys) {
@@ -21,7 +25,7 @@ async function getProfilesAndClients() {
 }
 
 async function getAllClients() {
-    const rc = await getDb()
+    const rc = await getDbClient()
     const keys = await rc.keys(dbKeyPrefix + 'cli:*')
     const clients: { [k: string]: ClientData } = {}
     for (const key of keys) {
@@ -47,7 +51,7 @@ async function countUnusedProfiles(andDeleteThem: boolean = false) {
     console.log(`There are ${profileKeys.length} profiles with no associated clients.`)
     console.log(`They are:\n${JSON.stringify(profileKeys, null, 2)}`)
     if (andDeleteThem) {
-        const rc = await getDb()
+        const rc = await getDbClient()
         const deletedKeyCount = await rc.del(profileKeys)
         console.warn(`Deleted ${deletedKeyCount} profiles`)
         const deletedClientCount = await rc.del(clientKeys)
@@ -55,7 +59,10 @@ async function countUnusedProfiles(andDeleteThem: boolean = false) {
     }
 }
 
-async function countUnusedClients(unusedSince: number = thirtyDaysAgo, andDeleteThem: boolean = false) {
+async function countUnusedClients(
+    unusedSince: number = thirtyDaysAgo,
+    andDeleteThem: boolean = false,
+) {
     const clients = await getAllClients()
     const oldClientIds: string[] = []
     const oldClientKeys: string[] = []
@@ -68,7 +75,7 @@ async function countUnusedClients(unusedSince: number = thirtyDaysAgo, andDelete
     console.log(`There are ${oldClientIds.length} clients unused since ${new Date(unusedSince)}`)
     console.log(`They are:\n${JSON.stringify(oldClientKeys, null, 2)}`)
     if (andDeleteThem) {
-        const rc = await getDb()
+        const rc = await getDbClient()
         for (const id of oldClientIds) {
             const profileId = clients[id].profileId
             if (profileId) {
@@ -77,6 +84,71 @@ async function countUnusedClients(unusedSince: number = thirtyDaysAgo, andDelete
         }
         const deleted = await rc.del(oldClientKeys)
         console.log(`Deleted ${deleted} clients unused since ${new Date(unusedSince)}`)
+    }
+}
+
+async function showTranscripts(collectedBefore: number = Date.now()) {
+    const rc = await getDbClient()
+    const prefix = dbKeyPrefix + `con:`
+    const keys = await rc.keys(`${prefix}*`)
+    for (const key of keys) {
+        const id = key.substring(prefix.length)
+        const transcripts = await getTranscriptsForConversation(id)
+        let showHeading = true
+        for (const tr of transcripts) {
+            if (tr.startTime > collectedBefore) {
+                break
+            }
+            if (showHeading) {
+                console.log(`Transcripts for conversation: ${id}:`)
+                console.log(`------------------------------------`)
+                showHeading = false
+            }
+            console.log(
+                `Start: ${new Date(tr.startTime)}, Duration: ${tr.duration! / 1000}:\n${tr.transcription}`,
+            )
+            console.log(`------------------------------------`)
+        }
+    }
+}
+
+async function migrateLegacyTranscripts() {
+    const rc = await getDbClient()
+    const prefix = dbKeyPrefix + `con:`
+    const keys = await rc.keys(`${prefix}*`)
+    for (const key of keys) {
+        const id = key.substring(prefix.length)
+        const transcripts = await getTranscriptsForConversation(id)
+        for (const tr of transcripts) {
+            let needsMigration = false
+            if (!tr['contentKey']) {
+                needsMigration = true
+                if (tr['contentPacketKey']) {
+                    tr.contentKey = tr['contentPacketKey']
+                    delete tr['contentPacketKey']
+                } else {
+                    console.warn(`Transcript ${tr.id} is missing a contentKey, adding one.`)
+                    tr.contentKey = dbKeyPrefix + 'tcp:' + 'legacy-missing'
+                }
+            }
+            if (!tr?.clientId) {
+                needsMigration = true
+                console.warn(`Transcript ${tr.id} is missing a clientId, adding one.`)
+                tr.clientId = 'legacy-missing'
+            }
+            if (!tr?.contentId) {
+                needsMigration = true
+                console.warn(`Transcript ${tr.id} is missing a contentId, adding one.`)
+                tr.contentId = 'legacy-missing'
+            }
+            const tKey = dbKeyPrefix + 'tra:' + tr.id
+            if ((await rc.ttl(tKey)) < 0 || (await rc.ttl(tr.contentKey)) < 0) {
+                needsMigration = true
+            }
+            if (needsMigration) {
+                await saveTranscript(tr)
+            }
+        }
     }
 }
 
@@ -97,6 +169,20 @@ async function doMaintenance(chores: string[]) {
         } else if (chore == 'delete-unused') {
             await countUnusedClients(thirtyDaysAgo, true)
             await countUnusedProfiles(true)
+        } else if (chore.startsWith('show-transcripts-')) {
+            if (chore.endsWith('all')) {
+                await showTranscripts()
+            } else if (chore.endsWith('1')) {
+                await showTranscripts(oneDayAgo)
+            } else if (chore.endsWith('7')) {
+                await showTranscripts(sevenDaysAgo)
+            } else if (chore.endsWith('30')) {
+                await showTranscripts(thirtyDaysAgo)
+            } else {
+                throw Error(`Unrecognized chore: ${chore}`)
+            }
+        } else if (chore === 'migrate-legacy-transcripts') {
+            await migrateLegacyTranscripts()
         } else {
             throw Error(`Unrecognized chore: ${chore}`)
         }

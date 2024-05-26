@@ -146,17 +146,20 @@ export async function suspendTranscriptions(transcriber: Promise<void>) {
     await unblockDbClient('blocking')
     await transcriber
     // if we have no transcripts in progress, we're done
-    // if (localTranscriptQueue.length == 0) {
-    //     return
-    // }
+    if (localTranscriptQueue.length == 0) {
+        console.log(`No local transcripts to suspend`)
+        return
+    }
     console.log(`Looking for another server to resume our transcripts...`)
     const rc = await getDbClient('blocking')
-    const result = await rc.brPop(dbKeyPrefix + globalServerQueueKey, 15)
+    const sKey = dbKeyPrefix + globalServerQueueKey
+    const result = await rc.blMove(sKey, sKey, 'RIGHT', 'LEFT', 15)
     if (result !== null) {
-        console.log(`Found a server with id ${result.element} to resume our transcripts`)
+        console.log(`Found a server with id ${result} to resume our transcripts`)
     } else {
         console.warn(`No server available to resume our transcripts, suspending anyway`)
     }
+    console.log(`Suspending ${localTranscriptQueue.length} local transcripts...`)
     for (let fn = localTranscriptQueue.pop(); fn; fn = localTranscriptQueue.pop()) {
         await fn()
     }
@@ -261,6 +264,11 @@ async function subscribeTranscriptPresence(tr: TranscriptData, ably: Ably.Realti
 
 async function suspendTranscription(tr: TranscriptData, ably: Ably.Realtime) {
     console.log(`Suspending transcription ${tr.id} for conversation ${tr.conversationId}`)
+    // first put the transcript where it can be picked up by another server
+    const rc = await getDbClient()
+    const key = dbKeyPrefix + globalTranscriptQueueKey
+    await rc.lPush(key, tr.id)
+    // then stop listening
     const content = ably.channels.get(`${tr.conversationId}:${tr.contentId}`)
     const control = ably.channels.get(`${tr.conversationId}:control`)
     await content.detach()
@@ -268,9 +276,6 @@ async function suspendTranscription(tr: TranscriptData, ably: Ably.Realtime) {
     control.presence.unsubscribe()
     await control.detach()
     ably.close()
-    const rc = await getDbClient()
-    const key = dbKeyPrefix + globalTranscriptQueueKey
-    await rc.lPush(key, tr.id)
 }
 
 async function endTranscription(tr: TranscriptData) {

@@ -27,23 +27,24 @@ but the public function that returns them sorts them newest start-date first.
 
 Transcript lifetime design note:
 
+Transcripts are only kept for a limited period, called their time-to-live.
+Database expirations are used to enforce the TTL, which saves the server
+from having to periodically delete old transcripts.
+
 Transcripts are started by server processes, but server processes are ephemeral,
 and the lifetime of a conversation may be longer than any given server process.
 In order for a transcript to outlive the server that starts them, that server
 hands the transcript session off when it shuts down by adding the transcript
 to a known queue. Every running server checks that queue on a continuous basis,
 so as long as any server is running the transcript will be picked up by some
-server as soon as it's queued.
-
-Transcripts are only kept for a limited period, called their time-to-live.
-Database expirations are used to enforce the TTL, which saves the server
-from having to periodically delete old transcripts.
+server as soon as it's queued. When a server is shut down in an orderly fashion,
+it queues its running transcripts for another server to find.
 
  */
 
 import * as Ably from 'ably/promises.js'
 import { getSettings } from '../settings.js'
-import { dbKeyPrefix, getDb } from '../db.js'
+import { dbKeyPrefix, getDbClient, unblockDbClient } from '../db.js'
 import { randomUUID } from 'crypto'
 import { parseContentChunk } from '../protocol.js'
 import express from 'express'
@@ -53,24 +54,27 @@ import { validateClientAuth } from '../auth.js'
 import { getClientData } from '../client.js'
 
 const defaultTranscriptTtl = 24 * 60 * 60
-const globalTranscriptQueueKey = 'trq:global'
+const globalTranscriptQueueKey = 'suspended-transcript-ids'
+const globalServerQueueKey = 'servers-doing-transcription'
+const myServerId = randomUUID()
 const localTranscriptQueue: (() => Promise<void>)[] = []
+let shutdownInProgress = false
 
 export interface TranscriptData {
-    id: string,
-    clientId: string,
-    conversationId: string,
-    contentId: string,
-    startTime: number,
-    duration?: number,
-    contentKey: string,
-    transcription?: string,
-    errCount?: number,
-    ttl?: number,
+    id: string
+    clientId: string
+    conversationId: string
+    contentId: string
+    startTime: number
+    duration?: number
+    contentKey: string
+    transcription?: string
+    errCount?: number
+    ttl?: number
 }
 
 export async function getTranscriptsForConversation(conversationId: string) {
-    const rc = await getDb()
+    const rc = await getDbClient()
     const key = dbKeyPrefix + 'cts:' + conversationId
     const ids = await rc.lRange(key, 0, -1)
     const liveKeys: string[] = []
@@ -85,10 +89,7 @@ export async function getTranscriptsForConversation(conversationId: string) {
     if (liveKeys.length == 0) {
         await rc.del(key)
     } else {
-        await rc.multi()
-            .del(key)
-            .rPush(key, liveKeys)
-            .exec()
+        await rc.multi().del(key).rPush(key, liveKeys).exec()
     }
     return transcripts.sort((a, b) => b.startTime - a.startTime)
 }
@@ -123,51 +124,85 @@ export async function listTranscripts(req: express.Request, resp: express.Respon
         console.error(`Request for transcripts for non-matching client and conversation`)
         resp.status(404).send({ status: 'error', reason: 'Not Found' })
     }
-    if (!await validateClientAuth(req, resp, clientId)) {
+    if (!(await validateClientAuth(req, resp, clientId))) {
         return
     }
     const trs = await getTranscriptsForConversation(req.params.conversationId)
     console.log(`Returning info on ${trs.length} transcripts`)
-    const data = trs.map(tr => {
-        return { id: tr.id, startTime: tr.startTime, duration: tr.duration, length: tr.transcription!.length }
+    const data = trs.map((tr) => {
+        return {
+            id: tr.id,
+            startTime: tr.startTime,
+            duration: tr.duration,
+            length: tr.transcription!.length,
+        }
     })
     resp.status(200).send(data)
 }
 
-export async function suspendTranscriptions() {
-    let count = 0
+export async function suspendTranscriptions(transcriber: Promise<void>) {
+    // stop accepting new transcripts
+    shutdownInProgress = true
+    await unblockDbClient('blocking')
+    await transcriber
+    // if we have no transcripts in progress, we're done
+    // if (localTranscriptQueue.length == 0) {
+    //     return
+    // }
+    console.log(`Looking for another server to resume our transcripts...`)
+    const rc = await getDbClient('blocking')
+    const result = await rc.brPop(dbKeyPrefix + globalServerQueueKey, 15)
+    if (result !== null) {
+        console.log(`Found a server with id ${result.element} to resume our transcripts`)
+    } else {
+        console.warn(`No server available to resume our transcripts, suspending anyway`)
+    }
     for (let fn = localTranscriptQueue.pop(); fn; fn = localTranscriptQueue.pop()) {
         await fn()
-        count++
     }
-    return count
+    return
 }
 
 export async function resumeTranscriptions() {
-    const rc = await getDb()
-    const key = dbKeyPrefix + globalTranscriptQueueKey
-    let count = 0
-    for (let id = await rc.rPop(key); id !== null; id = await rc.rPop(key)) {
-        const tr = await getTranscript(id)
-        if (!tr) {
-            console.warn(`Global transcript ${id} no longer exists, can't resume it`)
-            continue
+    const rc = await getDbClient('blocking')
+    const sKey = dbKeyPrefix + globalServerQueueKey
+    // signal that we are receiving transcripts
+    console.log(`Server id ${myServerId} is available to transcribe`)
+    rc.lPush(sKey, myServerId)
+    // pick up any waiting transcripts
+    const tKey = dbKeyPrefix + globalTranscriptQueueKey
+    do {
+        const result = await rc.brPop(tKey, 0)
+        if (result !== null) {
+            const tr = await getTranscript(result.element)
+            if (!tr) {
+                console.warn(
+                    `Global transcript ${result.element} no longer exists, can't resume it`,
+                )
+                continue
+            }
+            console.log(`Resume transcription ${tr.id} for conversation ${tr.conversationId}`)
+            await startLocalTranscript(tr)
         }
-        console.log(`Resume transcription ${tr.id} for conversation ${tr.conversationId}`)
-        await startLocalTranscript(tr)
-        count++
-    }
-    return count
+    } while (!shutdownInProgress)
+    console.log(`Server id ${myServerId} is no longer available to transcribe`)
+    await rc.lRem(sKey, 0, myServerId)
 }
 
-export async function startTranscription(clientId: string, conversationId: string, contentId: string) {
+export async function startTranscription(
+    clientId: string,
+    conversationId: string,
+    contentId: string,
+) {
     const tr = await createTranscript(clientId, conversationId, contentId)
     console.log(`Start transcription for conversation ${conversationId} in transcription ${tr.id}`)
     await startLocalTranscript(tr)
 }
 
 async function startLocalTranscript(tr: TranscriptData) {
-    console.log(`Locally listening for transcript ${tr.id}, clientId: ${tr.clientId}, contentId: ${tr.contentId}, chunks: ${tr.contentKey}`)
+    console.log(
+        `Locally listening for transcript ${tr.id}, clientId: ${tr.clientId}, contentId: ${tr.contentId}, chunks: ${tr.contentKey}`,
+    )
     const config = getSettings()
     const ably = new Ably.Realtime({
         clientId: 'whisper-server:' + tr.id,
@@ -179,7 +214,7 @@ async function startLocalTranscript(tr: TranscriptData) {
 }
 
 async function subscribeTranscriptContent(tr: TranscriptData, ably: Ably.Realtime) {
-    const rc = await getDb()
+    const rc = await getDbClient()
     const content = ably.channels.get(`${tr.conversationId}:${tr.contentId}`)
     await content.subscribe('all', (message) => {
         rc.lPush(tr.contentKey, message.data).then()
@@ -195,7 +230,9 @@ async function subscribeTranscriptPresence(tr: TranscriptData, ably: Ably.Realti
             switch (message.action) {
                 case 'enter':
                 case 'present':
-                    console.log(`Conversation ${tr.conversationId} (transcript ${tr.id}, chunks ${tr.contentKey}) is starting.`)
+                    console.log(
+                        `Conversation ${tr.conversationId} (transcript ${tr.id}, chunks ${tr.contentKey}) is starting.`,
+                    )
                     break
                 case 'leave':
                 case 'absent':
@@ -204,13 +241,17 @@ async function subscribeTranscriptPresence(tr: TranscriptData, ably: Ably.Realti
                     control.presence.unsubscribe()
                     control.detach().then()
                     setTimeout(() => ably.close(), 2000)
-                    console.log(`Transcription ${tr.id} (conversation ${tr.conversationId}, chunks ${tr.contentKey}) has ended.`)
+                    console.log(
+                        `Transcription ${tr.id} (conversation ${tr.conversationId}, chunks ${tr.contentKey}) has ended.`,
+                    )
                     endTranscription(tr).then()
                     break
                 case 'update':
                     break
                 default:
-                    console.error(`Ignoring unexpected presence message in transcription: ${message.action}`)
+                    console.error(
+                        `Ignoring unexpected presence message in transcription: ${message.action}`,
+                    )
             }
         }
     })
@@ -227,7 +268,7 @@ async function suspendTranscription(tr: TranscriptData, ably: Ably.Realtime) {
     control.presence.unsubscribe()
     await control.detach()
     ably.close()
-    const rc = await getDb()
+    const rc = await getDbClient()
     const key = dbKeyPrefix + globalTranscriptQueueKey
     await rc.lPush(key, tr.id)
 }
@@ -239,7 +280,9 @@ async function endTranscription(tr: TranscriptData) {
     tr.errCount = errCount
     await saveTranscript(tr)
     if (text || errCount) {
-        console.log(`Adding transcript of length ${text.length} to conversation ${tr.conversationId}`)
+        console.log(
+            `Adding transcript of length ${text.length} to conversation ${tr.conversationId}`,
+        )
         await addTranscriptToConversation(tr)
     } else {
         console.warn(`Discarding empty transcript for conversation ${tr.conversationId}`)
@@ -247,7 +290,12 @@ async function endTranscription(tr: TranscriptData) {
     }
 }
 
-async function createTranscript(clientId: string, conversationId: string, contentId: string, ttl: number | undefined = undefined) {
+async function createTranscript(
+    clientId: string,
+    conversationId: string,
+    contentId: string,
+    ttl: number | undefined = undefined,
+) {
     const id: string = randomUUID()
     const contentKey = dbKeyPrefix + 'tcp:' + randomUUID()
     const tr: TranscriptData = {
@@ -266,7 +314,7 @@ async function createTranscript(clientId: string, conversationId: string, conten
 }
 
 async function getTranscript(transcriptId: string) {
-    const rc = await getDb()
+    const rc = await getDbClient()
     const tKey = dbKeyPrefix + 'tra:' + transcriptId
     const data: { [k: string]: string | number } = await rc.hGetAll(tKey)
     if (!data?.id) {
@@ -282,7 +330,7 @@ async function getTranscript(transcriptId: string) {
 }
 
 export async function saveTranscript(tr: TranscriptData) {
-    const rc = await getDb()
+    const rc = await getDbClient()
     const tKey = dbKeyPrefix + 'tra:' + tr.id
     const ttl = tr?.ttl || defaultTranscriptTtl
     const newData: { [k: string]: string } = {
@@ -308,20 +356,20 @@ export async function saveTranscript(tr: TranscriptData) {
 }
 
 async function deleteTranscript(tr: TranscriptData) {
-    const rc = await getDb()
+    const rc = await getDbClient()
     const cKey = tr.contentKey
     const tKey = dbKeyPrefix + 'tra:' + tr.id
     await rc.del([tKey, cKey])
 }
 
 async function addTranscriptToConversation(data: TranscriptData) {
-    const rc = await getDb()
+    const rc = await getDbClient()
     const cKey = dbKeyPrefix + 'cts:' + data.conversationId
     await rc.lPush(cKey, data.id)
 }
 
 async function transcribePackets(transcriptId: string, contentKey: string) {
-    const rc = await getDb()
+    const rc = await getDbClient()
     let liveText = ''
     let transcription = ''
     let errCount = 0
@@ -355,7 +403,9 @@ async function transcribePackets(transcriptId: string, contentKey: string) {
                 liveText = liveText.substring(0, offset) + chunk.text
             } else {
                 const diff = offset - liveText.length
-                console.warn(`Transcription: Chunk offset indicates ${diff} missing characters, using ?`)
+                console.warn(
+                    `Transcription: Chunk offset indicates ${diff} missing characters, using ?`,
+                )
                 errCount++
                 liveText = liveText + '?'.repeat(diff) + chunk.text
             }

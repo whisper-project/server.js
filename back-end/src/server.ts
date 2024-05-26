@@ -16,19 +16,9 @@ import {
     suspendTranscriptions,
 } from './v2/transcribe.js'
 import { Server } from 'node:http'
+import { randomInt } from 'node:crypto'
 
-const PORT = process.env.PORT || 5001
-
-// first thing we do is to pick up any suspended transcriptions
-resumeTranscriptions().then((count) => console.log(`Startup: Resumed ${count} transcriptions.`))
-// then we do it again after we're sure the other server has shut down
-setTimeout(
-    () =>
-        resumeTranscriptions().then((count) =>
-            console.log(`Startup+10: Resumed ${count} transcriptions.`),
-        ),
-    10 * 1000,
-)
+const PORT = process.env.PORT || randomInt(5001, 5999)
 
 const release = express()
     .use(express.json())
@@ -55,33 +45,42 @@ const release = express()
 
 const debug = release.post('/test/transcript', asyncWrapper(postTranscript))
 
-let server: Server | undefined
-
-if (process.env.NODE_ENV === 'production') {
-    server = release.listen(PORT, () => console.log(`Listening (RELEASE) on port ${PORT}`))
-} else {
-    server = debug.listen(PORT, () => console.log(`Listening (DEBUG) on port ${PORT}`))
-}
-
-function shutdown(signal: string) {
-    console.warn(`Suspending local transcriptions due to ${signal}...`)
-    suspendTranscriptions().then((count) => console.log(`Suspended ${count} transcriptions.`))
-    if (server) {
-        console.warn(`Stopping webserver due to ${signal}...`)
-        server.close((err) => {
-            server = undefined
-            if (err) {
-                console.error(`The webserver was already stopped.`)
-            } else {
-                console.log(`The webserver stopped cleanly.`)
-            }
-        })
+function main() {
+    console.log(`Process ID for this server is ${process.pid}`)
+    // first thing we do is to start picking up suspended transcriptions
+    const transcriber = resumeTranscriptions()
+    // then we run the appropriate webserver, cleaning up on signals and crashes
+    let server: Server | undefined
+    process.once('SIGTERM', () => shutdown('SIGTERM', transcriber, server))
+    process.once('SIGINT', () => shutdown('SIGINT', transcriber, server))
+    try {
+        if (process.env.NODE_ENV === 'production') {
+            server = release.listen(PORT, () => console.log(`Listening (RELEASE) on port ${PORT}`))
+        } else {
+            server = debug.listen(PORT, () => console.log(`Listening (DEBUG) on port ${PORT}`))
+        }
+    } catch (err) {
+        shutdown(`error: ${err}`, transcriber, server)
     }
 }
 
-process.once('SIGTERM', () => {
-    shutdown('SIGTERM')
-})
-process.once('SIGINT', () => {
-    shutdown('SIGINT')
-})
+function shutdown(signal: string, transcriber: Promise<void>, server: Server | undefined) {
+    let exitStatus = 0
+    console.warn(`Shutting down due to ${signal}...`)
+    const suspend = suspendTranscriptions(transcriber)
+    if (server) {
+        server.close((err) => {
+            if (err) {
+                console.error(`The webserver was already stopped.`)
+                exitStatus = 1
+            } else {
+                console.log(`The webserver stopped cleanly.`)
+            }
+            suspend.then(() => process.exit(exitStatus))
+        })
+    } else {
+        suspend.then(() => process.exit(exitStatus))
+    }
+}
+
+main()

@@ -2,7 +2,7 @@
 // Licensed under the GNU Affero General Public License v3.
 // See the LICENSE file for details.
 
-import { dbKeyPrefix, getDb, setPresenceLogging } from '../db.js'
+import { dbKeyPrefix, getDbClient, setPresenceLogging } from '../db.js'
 import { getProfileClients, removeProfileClient } from '../profile.js'
 import { ClientData, getClientData } from '../client.js'
 import { loadSettings } from '../settings.js'
@@ -14,7 +14,7 @@ const thirtyDaysAgo = Date.now() - 30 * oneDayMillis
 const sevenDaysAgo = Date.now() - 7 * oneDayMillis
 
 async function getProfilesAndClients() {
-    const rc = await getDb()
+    const rc = await getDbClient()
     const keys = await rc.keys(dbKeyPrefix + 'pro:*')
     const profileClients: { [k: string]: string[] } = {}
     for (const key of keys) {
@@ -25,7 +25,7 @@ async function getProfilesAndClients() {
 }
 
 async function getAllClients() {
-    const rc = await getDb()
+    const rc = await getDbClient()
     const keys = await rc.keys(dbKeyPrefix + 'cli:*')
     const clients: { [k: string]: ClientData } = {}
     for (const key of keys) {
@@ -51,7 +51,7 @@ async function countUnusedProfiles(andDeleteThem: boolean = false) {
     console.log(`There are ${profileKeys.length} profiles with no associated clients.`)
     console.log(`They are:\n${JSON.stringify(profileKeys, null, 2)}`)
     if (andDeleteThem) {
-        const rc = await getDb()
+        const rc = await getDbClient()
         const deletedKeyCount = await rc.del(profileKeys)
         console.warn(`Deleted ${deletedKeyCount} profiles`)
         const deletedClientCount = await rc.del(clientKeys)
@@ -75,7 +75,7 @@ async function countUnusedClients(
     console.log(`There are ${oldClientIds.length} clients unused since ${new Date(unusedSince)}`)
     console.log(`They are:\n${JSON.stringify(oldClientKeys, null, 2)}`)
     if (andDeleteThem) {
-        const rc = await getDb()
+        const rc = await getDbClient()
         for (const id of oldClientIds) {
             const profileId = clients[id].profileId
             if (profileId) {
@@ -88,7 +88,7 @@ async function countUnusedClients(
 }
 
 async function showTranscripts(collectedBefore: number = Date.now()) {
-    const rc = await getDb()
+    const rc = await getDbClient()
     const prefix = dbKeyPrefix + `con:`
     const keys = await rc.keys(`${prefix}*`)
     for (const key of keys) {
@@ -113,7 +113,7 @@ async function showTranscripts(collectedBefore: number = Date.now()) {
 }
 
 async function migrateLegacyTranscripts() {
-    const rc = await getDb()
+    const rc = await getDbClient()
     const prefix = dbKeyPrefix + `con:`
     const keys = await rc.keys(`${prefix}*`)
     for (const key of keys) {

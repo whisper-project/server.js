@@ -2,25 +2,25 @@
 // Licensed under the GNU Affero General Public License v3.
 // See the LICENSE file for details.
 
-import { dbKeyPrefix, getDb, getPresenceLogging } from './db.js'
+import { dbKeyPrefix, getDbClient, getPresenceLogging } from './db.js'
 
 export interface ClientData {
-    id: string,
-    deviceId?: string,
-    token?: string,
+    id: string
+    deviceId?: string
+    token?: string
     lastSecret?: string
-    secret?: string,
-    secretDate?: number,
-    pushId?: string,
-    appInfo?: string,
-    userName?: string,      // used in v1 & v2
-    profileId?: string,     // used in v2
-    lastLaunch?: number,
-    isPresenceLogging?: number,
+    secret?: string
+    secretDate?: number
+    pushId?: string
+    appInfo?: string
+    userName?: string // used in v1 & v2
+    profileId?: string // used in v2
+    lastLaunch?: number
+    isPresenceLogging?: number
 }
 
 export async function getClientData(id: string) {
-    const rc = await getDb()
+    const rc = await getDbClient()
     const clientKey = dbKeyPrefix + `cli:${id}`
     const existing: { [index: string]: string | number } = await rc.hGetAll(clientKey)
     if (!existing?.id) {
@@ -36,7 +36,7 @@ export async function getClientData(id: string) {
 }
 
 export async function setClientData(clientData: ClientData) {
-    const rc = await getDb()
+    const rc = await getDbClient()
     const clientKey = dbKeyPrefix + `cli:${clientData.id}`
     await rc.hSet(clientKey, { ...clientData })
 }
@@ -67,7 +67,7 @@ export async function hasClientChanged(id: string, received: ClientData) {
         clientChanged = true
         changeReason = 'new build data from existing'
     }
-    if (!clientChanged && received.isPresenceLogging == 0 && await getPresenceLogging()) {
+    if (!clientChanged && received.isPresenceLogging == 0 && (await getPresenceLogging())) {
         clientChanged = true
         changeReason = 'logging state OFF from existing'
     }
@@ -75,7 +75,7 @@ export async function hasClientChanged(id: string, received: ClientData) {
 }
 
 export async function isApnsPostRepeat(received: ClientData) {
-    const rc = await getDb()
+    const rc = await getDbClient()
     const key = dbKeyPrefix + `apns:${received.id}|${received.token}`
     const existing = await rc.set(key, Date.now(), { NX: true, PX: 250, GET: true })
     return existing !== null

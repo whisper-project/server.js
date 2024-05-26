@@ -5,20 +5,22 @@
 import { fetch } from 'fetch-h2'
 import { createApnsJwt, refreshSecret } from './auth.js'
 import { getSettings } from './settings.js'
-import { dbKeyPrefix, getDb } from './db.js'
+import { dbKeyPrefix, getDbClient } from './db.js'
 
 interface ApnsRequestData {
-    id: string,
-    clientKey: string,
-    status: number,
-    devId?: string,
-    reason?: string,
+    id: string
+    clientKey: string
+    status: number
+    devId?: string
+    reason?: string
     timestamp?: number
 }
 
 export async function getApnsRequestData(requestKey: string) {
-    const db = await getDb()
-    const existing: { [index: string]: string | number } = await db.hGetAll(dbKeyPrefix + requestKey)
+    const db = await getDbClient()
+    const existing: { [index: string]: string | number } = await db.hGetAll(
+        dbKeyPrefix + requestKey,
+    )
     if (!existing?.id) {
         return undefined
     }
@@ -33,7 +35,7 @@ export async function setApnsRequestData(requestKey: string, data: ApnsRequestDa
     for (const key in data) {
         update[key] = data[key].toString()
     }
-    const rc = await getDb()
+    const rc = await getDbClient()
     await rc.hSet(dbKeyPrefix + requestKey, update)
 }
 
@@ -49,10 +51,10 @@ export async function sendSecretToClient(clientId: string, force: boolean = fals
     const path = `/3/device/${clientData.token}`
     const secret64 = Buffer.from(clientData.secret!, 'hex').toString('base64')
     const body = {
-        'aps': {
+        aps: {
             'content-available': 1,
         },
-        'secret': secret64,
+        secret: secret64,
     }
     const requestKey = `req:${clientData.pushId!}`
     const requestData: ApnsRequestData = {
@@ -67,7 +69,7 @@ export async function sendSecretToClient(clientId: string, force: boolean = fals
             cache: 'no-cache',
             credentials: 'same-origin',
             headers: {
-                'authorization': `Bearer ${await createApnsJwt()}`,
+                authorization: `Bearer ${await createApnsJwt()}`,
                 'apns-id': clientData.pushId!,
                 'apns-push-type': 'background',
                 'apns-priority': '5',
@@ -84,7 +86,9 @@ export async function sendSecretToClient(clientId: string, force: boolean = fals
         if (response.status >= 400) {
             const body = await response.json()
             requestData.reason = body.reason
-            console.log(`APNS post failed with status ${response.status} and reason: ${body.reason}`)
+            console.log(
+                `APNS post failed with status ${response.status} and reason: ${body.reason}`,
+            )
             if (body?.timestamp) {
                 requestData.timestamp = body.timestamp
             }

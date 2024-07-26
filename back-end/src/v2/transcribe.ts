@@ -133,6 +133,7 @@ export async function listTranscripts(req: express.Request, resp: express.Respon
     if (!clientId || cli?.profileId !== con.ownerId) {
         console.error(`Request for transcripts for non-matching client and conversation`)
         resp.status(404).send({ status: 'error', reason: 'Not Found' })
+        return
     }
     if (!(await validateClientAuth(req, resp, clientId))) {
         return
@@ -252,13 +253,19 @@ async function subscribeTranscriptPresence(tr: TranscriptData, ably: Ably.Realti
         if (message.clientId == tr.clientId) {
             switch (message.action) {
                 case 'enter':
+                    console.log(
+                        `Whisperer has entered ${tr.conversationId} (transcript ${tr.id}, chunks ${tr.contentKey}).`,
+                    )
+                    break
                 case 'present':
                     console.log(
-                        `Conversation ${tr.conversationId} (transcript ${tr.id}, chunks ${tr.contentKey}) is starting.`,
+                        `Whisperer is present in ${tr.conversationId} (transcript ${tr.id}, chunks ${tr.contentKey}).`,
                     )
                     break
                 case 'leave':
-                case 'absent':
+                    console.log(
+                        `Whisperer has left ${tr.conversationId} (transcript ${tr.id}, chunks ${tr.contentKey}).`,
+                    )
                     content.detach().then()
                     control.presence.leave('transcription')
                     control.presence.unsubscribe()
@@ -268,6 +275,11 @@ async function subscribeTranscriptPresence(tr: TranscriptData, ably: Ably.Realti
                         `Transcription ${tr.id} (conversation ${tr.conversationId}, chunks ${tr.contentKey}) has ended.`,
                     )
                     endTranscription(tr).then()
+                    break
+                case 'absent':
+                    console.log(
+                        `Whisperer is absent from ${tr.conversationId} (transcript ${tr.id}, chunks ${tr.contentKey}).`,
+                    )
                     break
                 case 'update':
                     break

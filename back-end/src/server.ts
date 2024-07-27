@@ -10,6 +10,7 @@ import { subscribeToPublisher } from './v1/routes.js'
 import { listenToConversation } from './v2/routes.js'
 import { asyncWrapper, cookieMiddleware, sessionMiddleware } from './middleware.js'
 import {
+    SERVER_ID,
     getTranscriptPage,
     postTranscript,
     resumeTranscriptions,
@@ -46,7 +47,7 @@ const release = express()
 const debug = release.post('/test/transcript', asyncWrapper(postTranscript))
 
 function main() {
-    console.log(`Starting server with process ID {process.pid}`)
+    console.log(`Starting server ${SERVER_ID}...`)
     // first thing we do is to start picking up suspended transcriptions
     const transcriber = resumeTranscriptions()
     // then we run the appropriate webserver, cleaning up on signals and crashes
@@ -55,9 +56,13 @@ function main() {
     process.once('SIGINT', () => shutdown('SIGINT', transcriber, server))
     try {
         if (process.env.NODE_ENV === 'production') {
-            server = release.listen(PORT, () => console.log(`Listening (RELEASE) on port ${PORT}`))
+            server = release.listen(PORT, () =>
+                console.log(`Server ${SERVER_ID} listening (RELEASE) on port ${PORT}`),
+            )
         } else {
-            server = debug.listen(PORT, () => console.log(`Listening (DEBUG) on port ${PORT}`))
+            server = debug.listen(PORT, () =>
+                console.log(`Server ${SERVER_ID} listening (DEBUG) on port ${PORT}`),
+            )
         }
     } catch (err) {
         shutdown(`error: ${err}`, transcriber, server)
@@ -66,19 +71,19 @@ function main() {
 
 function shutdown(signal: string, transcriber: Promise<void>, server: Server | undefined) {
     let exitStatus = 0
-    console.warn(`Shutting down process ID ${process.pid} due to ${signal}...`)
+    console.warn(`Shutting down Server ${SERVER_ID} due to ${signal}...`)
     const suspend = suspendTranscriptions(transcriber)
     const notifyAndExit = () => {
-        console.log(`Terminating server process ${process.pid} after shutdown`)
+        console.log(`Terminating Server ${SERVER_ID} after shutdown`)
         process.exit(exitStatus)
     }
     if (server) {
         server.close((err) => {
             if (err) {
-                console.error(`The webserver was already stopped.`)
+                console.error(`Server ${SERVER_ID}'s webserver was already stopped.`)
                 exitStatus = 1
             } else {
-                console.log(`The webserver stopped cleanly.`)
+                console.log(`Server ${SERVER_ID}'s webserver stopped cleanly.`)
             }
             suspend.then(notifyAndExit)
         })

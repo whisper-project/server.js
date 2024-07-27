@@ -61,10 +61,11 @@ import { getConversationInfo } from '../profile.js'
 import { validateClientAuth } from '../auth.js'
 import { getClientData } from '../client.js'
 
+export const SERVER_ID = randomUUID()
+
 const defaultTranscriptTtl = 24 * 60 * 60
 const globalTranscriptQueueKey = 'suspended-transcript-ids'
 const globalServerQueueKey = 'servers-doing-transcription'
-const myServerId = randomUUID()
 const localTranscripts: Map<string, Ably.Realtime> = new Map()
 
 // global transcription suspend/resume overlap parameters
@@ -159,26 +160,28 @@ export async function suspendTranscriptions(transcriber: Promise<void>) {
     await transcriber
     // if we have no transcripts in progress, we're done
     if (localTranscripts.size == 0) {
-        console.log(`No local transcripts to suspend`)
+        console.log(`Server ${SERVER_ID}: No local transcripts to suspend`)
         return
     }
-    console.log(`Looking for another server to resume our transcripts...`)
+    console.log(`Server ${SERVER_ID}: Looking for another server to resume our transcripts...`)
     const rc = await getDbClient('blocking')
     const sKey = dbKeyPrefix + globalServerQueueKey
     const result = await rc.blMove(sKey, sKey, 'RIGHT', 'LEFT', 15)
     if (result !== null) {
-        console.log(`Found a server with id ${result} to resume our transcripts`)
+        console.log(`Server ${SERVER_ID}: Found Server ${result} to resume our transcripts`)
     } else {
-        console.warn(`No server available to resume our transcripts, suspending anyway`)
+        console.warn(
+            `Server ${SERVER_ID}: No server available to resume our transcripts, suspending anyway`,
+        )
     }
-    console.log(`Suspending ${localTranscripts.size} local transcripts...`)
+    console.log(`Server ${SERVER_ID}: Suspending ${localTranscripts.size} local transcripts...`)
     const promises: Promise<void>[] = []
     for (const [trId, ably] of localTranscripts) {
         const tr = await getTranscript(trId)
         if (tr && !tr.transcription && !tr.errCount) {
             promises.push(suspendTranscription(tr, ably))
         } else {
-            console.warn(`Ignoring inactive transcript ${trId} during suspend`)
+            console.warn(`Server ${SERVER_ID}: Ignoring inactive transcript ${trId} during suspend`)
         }
     }
     localTranscripts.clear()
@@ -190,8 +193,8 @@ export async function resumeTranscriptions() {
     const rc = await getDbClient('blocking')
     const sKey = dbKeyPrefix + globalServerQueueKey
     // signal that we are receiving transcripts
-    console.log(`Server id ${myServerId} is available to transcribe`)
-    rc.lPush(sKey, myServerId)
+    console.log(`Server ${SERVER_ID} is available to transcribe`)
+    rc.lPush(sKey, SERVER_ID)
     // pick up any waiting transcripts
     const tKey = dbKeyPrefix + globalTranscriptQueueKey
     do {
@@ -199,18 +202,24 @@ export async function resumeTranscriptions() {
         if (result !== null) {
             const tr = await getTranscript(result.element)
             if (!tr) {
-                console.warn(`Transcript ${result.element} no longer exists, can't resume it`)
+                console.warn(
+                    `Server ${SERVER_ID}: Transcript ${result.element} no longer exists, can't resume it`,
+                )
                 continue
             } else if (tr.transcription || tr.errCount) {
-                console.warn(`Transcript ${tr.id} has been transcribed, not resuming it`)
+                console.warn(
+                    `Server ${SERVER_ID}: Transcript ${tr.id} has been transcribed, not resuming it`,
+                )
                 continue
             }
-            console.log(`Resume transcription ${tr.id} for conversation ${tr.conversationId}`)
+            console.log(
+                `Server ${SERVER_ID}: Resuming transcription ${tr.id} for conversation ${tr.conversationId}`,
+            )
             await startLocalTranscript(tr)
         }
     } while (!suspendInProgress)
-    console.log(`Server id ${myServerId} is no longer available to transcribe`)
-    await rc.lRem(sKey, 0, myServerId)
+    console.log(`Server ${SERVER_ID} is no longer available to transcribe`)
+    await rc.lRem(sKey, 0, SERVER_ID)
 }
 
 export async function startTranscription(
@@ -329,7 +338,9 @@ async function terminateTranscribing(tr: TranscriptData, ably: Ably.Realtime, de
 }
 
 async function suspendTranscription(tr: TranscriptData, ably: Ably.Realtime) {
-    console.log(`Suspending transcription ${tr.id} for conversation ${tr.conversationId}`)
+    console.log(
+        `Server ${SERVER_ID}: Suspending transcription ${tr.id} for conversation ${tr.conversationId}`,
+    )
     // first put the transcript where it can be picked up by another server
     const rc = await getDbClient()
     const key = dbKeyPrefix + globalTranscriptQueueKey

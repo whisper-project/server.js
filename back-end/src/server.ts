@@ -46,7 +46,7 @@ const release = express()
 const debug = release.post('/test/transcript', asyncWrapper(postTranscript))
 
 function main() {
-    console.log(`Process ID for this server is ${process.pid}`)
+    console.log(`Starting server with process ID {process.pid}`)
     // first thing we do is to start picking up suspended transcriptions
     const transcriber = resumeTranscriptions()
     // then we run the appropriate webserver, cleaning up on signals and crashes
@@ -66,10 +66,10 @@ function main() {
 
 function shutdown(signal: string, transcriber: Promise<void>, server: Server | undefined) {
     let exitStatus = 0
-    console.warn(`Shutting down due to ${signal}...`)
+    console.warn(`Shutting down process ID ${process.pid} due to ${signal}...`)
     const suspend = suspendTranscriptions(transcriber)
     const notifyAndExit = () => {
-        console.log(`Terminating server process after shutdown`)
+        console.log(`Terminating server process ${process.pid} after shutdown`)
         process.exit(exitStatus)
     }
     if (server) {

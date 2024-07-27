@@ -17,7 +17,7 @@ import {
     setConversationInfo,
 } from '../profile.js'
 import { dbKeyPrefix, getDbClient, getPresenceLogging } from '../db.js'
-import { startTranscription } from './transcribe.js'
+import { ensureTranscriptionEnded, startTranscription } from './transcribe.js'
 
 export async function pubSubTokenRequest(req: express.Request, res: express.Response) {
     const rc = await getDbClient()
@@ -61,12 +61,24 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
             await setConversationInfo(info)
             const update: ProfileData = { id: body.profileId, name: body.username }
             await saveProfileData(update)
+            // make sure any existing transcript for this client is terminated,
+            // in case the client crashed without closing it down.
+            const cetKey = dbKeyPrefix + `cet:${clientId}`
+            const existingTranscriptId = await rc.get(cetKey)
+            if (existingTranscriptId !== null) {
+                await ensureTranscriptionEnded(existingTranscriptId)
+            }
             if (body?.transcribe === 'yes') {
-                await startTranscription(clientId, conversationId, body.contentId)
+                const trId = await startTranscription(clientId, conversationId, body.contentId)
+                // remember transcript against this client
+                await rc.set(cetKey, trId)
+            } else {
+                // there is no transcription against this client
+                await rc.del(cetKey)
             }
         } else {
             console.log(
-                `Reauthenticating whisperer ${body.profileId} (${body.username}) ` +
+                `Renewing authentication: Whisperer ${body.profileId} (${body.username}) ` +
                     `for conversation ${conversationId} (${body.conversationName}) ` +
                     `from client ${clientId}`,
             )
@@ -90,7 +102,7 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
         } else {
             const profile = await getProfileData(body.profileId)
             console.log(
-                `Reauthenticating listener ${body.profileId} (${profile?.name}) ` +
+                `Renewing authentication: Listener ${body.profileId} (${profile?.name}) ` +
                     `to listen to conversation ${conversationId} (${body.conversationName}) ` +
                     `from client ${clientId}`,
             )

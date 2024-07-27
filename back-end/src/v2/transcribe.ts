@@ -63,7 +63,8 @@ import { getClientData } from '../client.js'
 
 export const SERVER_ID = randomUUID()
 
-const defaultTranscriptTtl = 24 * 60 * 60
+const defaultTranscriptTtl = 365 * 24 * 60 * 60
+const defaultTranscriptLookBack = 30 * 24 * 60 * 60
 const globalTranscriptQueueKey = 'suspended-transcript-ids'
 const globalServerQueueKey = 'servers-doing-transcription'
 const localTranscripts: Map<string, Ably.Realtime> = new Map()
@@ -86,6 +87,7 @@ export interface TranscriptData {
 }
 
 export async function getTranscriptsForConversation(conversationId: string) {
+    const now = Date.now()
     const rc = await getDbClient()
     const key = dbKeyPrefix + 'cts:' + conversationId
     const ids = await rc.lRange(key, 0, -1)
@@ -94,6 +96,9 @@ export async function getTranscriptsForConversation(conversationId: string) {
     for (const id of ids) {
         const tr = await getTranscript(id)
         if (tr) {
+            if (now - tr.startTime > defaultTranscriptLookBack) {
+                break
+            }
             transcripts.push(tr)
             liveKeys.push(id)
         }

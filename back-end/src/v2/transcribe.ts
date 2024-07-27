@@ -55,7 +55,7 @@ import express from 'express'
 
 import { getSettings } from '../settings.js'
 import { dbKeyPrefix, getDbClient, unblockDbClient } from '../db.js'
-import { parseContentChunk } from '../protocol.js'
+import { parseContentChunk, parsePresenceChunk } from '../protocol.js'
 import { transcriptResponse } from './templates.js'
 import { getConversationInfo } from '../profile.js'
 import { validateClientAuth } from '../auth.js'
@@ -260,7 +260,7 @@ async function startLocalTranscript(tr: TranscriptData) {
         key: config.ablyPublishKey,
     })
     await subscribeTranscriptContent(tr, ably)
-    await subscribeTranscriptPresence(tr, ably)
+    await subscribeTranscriptControl(tr, ably)
     localTranscripts.set(tr.id, ably)
 }
 
@@ -281,40 +281,27 @@ async function subscribeTranscriptContent(tr: TranscriptData, ably: Ably.Realtim
     console.log(`Subscribed to ${tr.conversationId}:${tr.contentId}`)
 }
 
-async function subscribeTranscriptPresence(tr: TranscriptData, ably: Ably.Realtime) {
+async function subscribeTranscriptControl(tr: TranscriptData, ably: Ably.Realtime) {
     const control = ably.channels.get(`${tr.conversationId}:control`)
     let subscribed = true
-    let last_message_id = ''
-    await control.presence.subscribe((message) => {
-        if (message.id === last_message_id) {
-            return
-        } else {
-            last_message_id = message.id
-        }
-        if (message.clientId == tr.clientId && message.data == 'whisperer') {
-            switch (message.action) {
-                case 'enter':
-                    console.log(
-                        `Whisperer has entered ${tr.conversationId} (transcript ${tr.id}, chunks ${tr.contentKey}).`,
-                    )
-                    break
-                case 'leave':
-                    console.log(
-                        `Whisperer has left ${tr.conversationId} (transcript ${tr.id}, chunks ${tr.contentKey}).`,
-                    )
-                    if (!subscribed) {
-                        // already stopped transcribing
-                        console.warn(`Received duplicate leave message from Whisperer: ${message}`)
-                        return
-                    }
-                    subscribed = false
-                    terminateTranscribing(tr, ably, 0).then()
-                    break
+    await control.subscribe((message) => {
+        if (message.clientId == tr.clientId) {
+            const info = parsePresenceChunk(message.data)
+            if (info && info.clientId == tr.clientId && info.offset === 'dropping') {
+                console.log(
+                    `Whisperer has dropped from ${tr.conversationId} with transcription ${tr.id}`,
+                )
+                if (!subscribed) {
+                    // already stopped transcribing
+                    console.warn(`Received duplicate drop message from Whisperer: ${message}`)
+                    return
+                }
+                subscribed = false
+                terminateTranscribing(tr, ably, 0).then()
             }
         }
     })
-    console.log(`Subscribed to presence on ${tr.conversationId}:control`)
-    await control.presence.enter('transcription')
+    console.log(`Subscribed to control channel on ${tr.conversationId}`)
 }
 
 async function terminateTranscribing(tr: TranscriptData, ably: Ably.Realtime, delayMs: number) {
@@ -328,8 +315,7 @@ async function terminateTranscribing(tr: TranscriptData, ably: Ably.Realtime, de
             await new Promise((resolve) => setTimeout(resolve, delayMs))
         }
         await content.detach()
-        await control.presence.leave('transcription')
-        control.presence.unsubscribe()
+        control.unsubscribe()
         await control.detach()
         ably.close()
     }

@@ -80,10 +80,10 @@ function shutdown(signal: string, transcriber: Promise<void>, server: Server | u
     if (server) {
         server.close((err) => {
             if (err) {
-                console.error(`Server ${SERVER_ID}'s webserver was already stopped.`)
+                console.error(`Server ${SERVER_ID}: webserver was already stopped.`)
                 exitStatus = 1
             } else {
-                console.log(`Server ${SERVER_ID}'s webserver stopped cleanly.`)
+                console.log(`Server ${SERVER_ID}: webserver stopped cleanly.`)
             }
             suspend.then(notifyAndExit)
         })

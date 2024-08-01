@@ -400,7 +400,7 @@ async function getTranscript(transcriptId: string) {
     return data as unknown as TranscriptData
 }
 
-export async function saveTranscript(tr: TranscriptData) {
+async function saveTranscript(tr: TranscriptData) {
     const rc = await getDbClient()
     const tKey = dbKeyPrefix + 'tra:' + tr.id
     const ttl = tr?.ttl || defaultTranscriptTtlSec
@@ -531,4 +531,42 @@ export async function postTranscript(req: express.Request, resp: express.Respons
     }
     const page = await transcriptResponse(tr)
     resp.status(200).send(page)
+}
+
+///
+/// for maintenance purposes
+///
+
+/// find all the transcripts and assign them to their conversations
+export async function assignTranscriptsToConversations(
+    inPastMs: number = defaultTranscriptLookBackMs,
+) {
+    const now = Date.now()
+    const rc = await getDbClient()
+    const prefix = dbKeyPrefix + `tra:`
+    const keys = await rc.keys(`${prefix}*`)
+    const map: Map<string, TranscriptData[]> = new Map()
+    for (const key of keys) {
+        const tr = await getTranscript(key.substring(prefix.length))
+        if (!tr) {
+            console.error(`Found a transcript key without data: ${key}`)
+            continue
+        }
+        if (now - tr.startTime > inPastMs) {
+            continue
+        }
+        const existing = map.get(tr.conversationId)
+        if (existing) {
+            existing.push(tr)
+        } else {
+            map.set(tr.conversationId, [tr])
+        }
+    }
+    for (const [id, transcripts] of map) {
+        console.log(`Assigning ${transcripts.length} transcripts to conversation ${id}`)
+        transcripts.sort((a, b) => b.startTime - a.startTime)
+        const trIds = transcripts.map((transcript) => transcript.id)
+        const key = dbKeyPrefix + `cts:` + id
+        await rc.multi().del(key).rPush(key, trIds).exec()
+    }
 }

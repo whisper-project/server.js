@@ -61,19 +61,29 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
             await setConversationInfo(info)
             const update: ProfileData = { id: body.profileId, name: body.username }
             await saveProfileData(update)
-            // make sure any existing transcript for this client is terminated,
-            // in case the client crashed without closing it down.
+            // make sure any existing transcript for this profile or client is terminated,
+            // in case the user crashed their app without stopping the transcript.
+            const cptKey = dbKeyPrefix + `cpt:${body.profileId}`
+            const existingProfileTranscriptId = await rc.get(cptKey)
             const cetKey = dbKeyPrefix + `cet:${clientId}`
-            const existingTranscriptId = await rc.get(cetKey)
-            if (existingTranscriptId !== null) {
-                await ensureTranscriptionEnded(existingTranscriptId)
+            if (existingProfileTranscriptId !== null) {
+                await ensureTranscriptionEnded(existingProfileTranscriptId)
+            }
+            const existingClientTranscriptId = await rc.get(cetKey)
+            if (
+                existingClientTranscriptId !== null &&
+                existingClientTranscriptId !== existingProfileTranscriptId
+            ) {
+                await ensureTranscriptionEnded(existingClientTranscriptId)
             }
             if (body?.transcribe === 'yes') {
                 const trId = await startTranscription(clientId, conversationId, body.contentId)
-                // remember transcript against this client
+                // remember transcript against this profile and client
+                await rc.set(cptKey, trId)
                 await rc.set(cetKey, trId)
             } else {
-                // there is no transcription against this client
+                // there is no transcription against this profile or client
+                await rc.del(cptKey)
                 await rc.del(cetKey)
             }
         } else {

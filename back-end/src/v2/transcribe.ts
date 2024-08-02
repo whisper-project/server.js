@@ -246,6 +246,7 @@ export async function ensureTranscriptionEnded(id: string) {
             `Force terminating transcription ${tr.id} for conversation ${tr.conversationId}`,
         )
         await terminateTranscribing(tr, ably, 0)
+        await endTranscription(tr)
     } else if (ably && ably.connection.state !== 'disconnected') {
         console.error(`Found ably client for transcript ${id} but transcription is missing`)
         ably.close()
@@ -302,7 +303,7 @@ async function subscribeTranscriptControl(tr: TranscriptData, ably: Ably.Realtim
                     return
                 }
                 subscribed = false
-                terminateTranscribing(tr, ably, 0).then()
+                terminateTranscribing(tr, ably, 0).then(() => endTranscription(tr).then())
             }
         }
     })
@@ -325,7 +326,6 @@ async function terminateTranscribing(tr: TranscriptData, ably: Ably.Realtime, de
         ably.close()
     }
     localTranscripts.delete(tr.id)
-    await endTranscription(tr)
 }
 
 async function suspendTranscription(tr: TranscriptData, ably: Ably.Realtime) {

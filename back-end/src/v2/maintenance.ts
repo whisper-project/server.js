@@ -6,7 +6,7 @@ import { dbKeyPrefix, getDbClient, setPresenceLogging } from '../db.js'
 import { getProfileClients, removeProfileClient } from '../profile.js'
 import { ClientData, getClientData } from '../client.js'
 import { loadSettings } from '../settings.js'
-import { getTranscriptsForConversation, saveTranscript } from './transcribe.js'
+import { assignTranscriptsToConversations, getTranscriptsForConversation } from './transcribe.js'
 
 const oneDayMillis = 24 * 60 * 60 * 1000
 const oneDayAgo = Date.now() - oneDayMillis
@@ -112,46 +112,6 @@ async function showTranscripts(collectedBefore: number = Date.now()) {
     }
 }
 
-async function migrateLegacyTranscripts() {
-    const rc = await getDbClient()
-    const prefix = dbKeyPrefix + `con:`
-    const keys = await rc.keys(`${prefix}*`)
-    for (const key of keys) {
-        const id = key.substring(prefix.length)
-        const transcripts = await getTranscriptsForConversation(id)
-        for (const tr of transcripts) {
-            let needsMigration = false
-            if (!tr['contentKey']) {
-                needsMigration = true
-                if (tr['contentPacketKey']) {
-                    tr.contentKey = tr['contentPacketKey']
-                    delete tr['contentPacketKey']
-                } else {
-                    console.warn(`Transcript ${tr.id} is missing a contentKey, adding one.`)
-                    tr.contentKey = dbKeyPrefix + 'tcp:' + 'legacy-missing'
-                }
-            }
-            if (!tr?.clientId) {
-                needsMigration = true
-                console.warn(`Transcript ${tr.id} is missing a clientId, adding one.`)
-                tr.clientId = 'legacy-missing'
-            }
-            if (!tr?.contentId) {
-                needsMigration = true
-                console.warn(`Transcript ${tr.id} is missing a contentId, adding one.`)
-                tr.contentId = 'legacy-missing'
-            }
-            const tKey = dbKeyPrefix + 'tra:' + tr.id
-            if ((await rc.ttl(tKey)) < 0 || (await rc.ttl(tr.contentKey)) < 0) {
-                needsMigration = true
-            }
-            if (needsMigration) {
-                await saveTranscript(tr)
-            }
-        }
-    }
-}
-
 async function doMaintenance(chores: string[]) {
     loadSettings()
     for (const chore of chores) {
@@ -181,8 +141,8 @@ async function doMaintenance(chores: string[]) {
             } else {
                 throw Error(`Unrecognized chore: ${chore}`)
             }
-        } else if (chore === 'migrate-legacy-transcripts') {
-            await migrateLegacyTranscripts()
+        } else if (chore === 'assign-transcripts') {
+            await assignTranscriptsToConversations()
         } else {
             throw Error(`Unrecognized chore: ${chore}`)
         }

@@ -1,6 +1,6 @@
 {
   "name": "whisper-server",
-  "version": "2.3.1",
+  "version": "2.4.0",
   "description": "Support the use of internet with the iOS app Whisper",
   "author": "dan@clickonetwo.io",
   "license": "AGPL v3",

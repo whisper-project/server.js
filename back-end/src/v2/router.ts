@@ -4,14 +4,23 @@
 
 import express from 'express'
 
+import { listenTokenRequest, postConversation, postUsername, pubSubTokenRequest } from './routes.js'
+import { asyncWrapper, cookieMiddleware, sessionMiddleware } from '../middleware.js'
 import {
+    apnsReceivedNotification,
+    apnsToken,
+    logAnomaly,
+    logChannelEvent,
+    logPresenceChunk,
+} from '../routes.js'
+import { listTranscripts } from './transcribe.js'
+import {
+    favoritesProfileGet,
+    favoritesProfilePost,
+    favoritesProfilePut,
     listenProfileGet,
     listenProfilePost,
     listenProfilePut,
-    listenTokenRequest,
-    postConversation,
-    postUsername,
-    pubSubTokenRequest,
     settingsProfileGet,
     settingsProfilePost,
     settingsProfilePut,
@@ -21,10 +30,7 @@ import {
     whisperProfileGet,
     whisperProfilePost,
     whisperProfilePut,
-} from './routes.js'
-import { asyncWrapper, cookieMiddleware, sessionMiddleware } from '../middleware.js'
-import { apnsReceivedNotification, apnsToken, logAnomaly, logChannelEvent, logPresenceChunk } from '../routes.js'
-import { listTranscripts } from './transcribe.js'
+} from './profiles.js'
 
 export const v2router = express.Router()
 
@@ -46,8 +52,15 @@ v2router
     .post('/settingsProfile', asyncWrapper(settingsProfilePost))
     .put('/settingsProfile/:profileId', asyncWrapper(settingsProfilePut))
     .get('/settingsProfile/:profileId', asyncWrapper(settingsProfileGet))
+    .post('/favoritesProfile', asyncWrapper(favoritesProfilePost))
+    .put('/favoritesProfile/:profileId', asyncWrapper(favoritesProfilePut))
+    .get('/favoritesProfile/:profileId', asyncWrapper(favoritesProfileGet))
     .post('/conversation', asyncWrapper(postConversation))
     .post('/username', asyncWrapper(postUsername))
     .post('/pubSubTokenRequest', asyncWrapper(pubSubTokenRequest))
-    .get('/listenTokenRequest', [cookieMiddleware, sessionMiddleware], asyncWrapper(listenTokenRequest))
+    .get(
+        '/listenTokenRequest',
+        [cookieMiddleware, sessionMiddleware],
+        asyncWrapper(listenTokenRequest),
+    )
     .get('/listTranscripts/:clientId/:conversationId', asyncWrapper(listTranscripts))

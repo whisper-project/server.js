@@ -16,6 +16,8 @@ export interface ProfileData {
     settingsVersion?: number
     settingsETag?: string
     settingsProfile?: string
+    favoritesTimestamp?: string
+    favoritesProfile?: string
 }
 
 export async function getProfileData(id: string) {

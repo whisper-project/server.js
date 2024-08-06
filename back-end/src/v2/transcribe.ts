@@ -158,26 +158,25 @@ export async function listTranscripts(req: express.Request, resp: express.Respon
     resp.status(200).send(data)
 }
 
-export async function suspendTranscriptions(transcriber: Promise<void>) {
+export async function suspendTranscriptions() {
     // stop accepting new transcripts
+    console.log(`Server ${SERVER_ID} is no longer available to transcribe`)
     suspendInProgress = true
+    const rc = await getDbClient()
+    const sKey = dbKeyPrefix + globalServerQueueKey
+    await rc.lRem(sKey, 0, SERVER_ID)
     await unblockDbClient('blocking')
-    await transcriber
     // if we have no transcripts in progress, we're done
     if (localTranscripts.size == 0) {
         console.log(`Server ${SERVER_ID}: No local transcripts to suspend`)
         return
     }
     console.log(`Server ${SERVER_ID}: Looking for another server to resume our transcripts...`)
-    const rc = await getDbClient('blocking')
-    const sKey = dbKeyPrefix + globalServerQueueKey
-    const result = await rc.blMove(sKey, sKey, 'RIGHT', 'LEFT', 15)
+    const result = await rc.blMove(sKey, sKey, 'RIGHT', 'LEFT', 20)
     if (result !== null) {
         console.log(`Server ${SERVER_ID}: Found Server ${result} to resume our transcripts`)
     } else {
-        console.warn(
-            `Server ${SERVER_ID}: No server available to resume our transcripts, suspending anyway`,
-        )
+        console.warn(`Server ${SERVER_ID}: No server available to resume our transcripts`)
     }
     console.log(`Server ${SERVER_ID}: Suspending ${localTranscripts.size} local transcripts...`)
     const promises: Promise<void>[] = []
@@ -202,29 +201,33 @@ export async function resumeTranscriptions() {
     rc.lPush(sKey, SERVER_ID)
     // pick up any waiting transcripts
     const tKey = dbKeyPrefix + globalTranscriptQueueKey
-    do {
-        const result = await rc.brPop(tKey, 0)
-        if (result !== null) {
-            const tr = await getTranscript(result.element)
-            if (!tr) {
-                console.warn(
-                    `Server ${SERVER_ID}: Transcript ${result.element} no longer exists, can't resume it`,
-                )
-                continue
-            } else if (tr.transcription || tr.errCount) {
-                console.warn(
-                    `Server ${SERVER_ID}: Transcript ${tr.id} has been transcribed, not resuming it`,
-                )
-                continue
-            }
-            console.log(
-                `Server ${SERVER_ID}: Resuming transcription ${tr.id} for conversation ${tr.conversationId}`,
-            )
-            await startLocalTranscript(tr)
+    while (!suspendInProgress) {
+        const result = await rc.brPop(tKey, 10)
+        if (result === null) {
+            continue
         }
-    } while (!suspendInProgress)
-    console.log(`Server ${SERVER_ID} is no longer available to transcribe`)
-    await rc.lRem(sKey, 0, SERVER_ID)
+        if (suspendInProgress) {
+            // we got a transcript request just as we were exiting
+            await rc.lPush(tKey, result.element)
+            continue
+        }
+        const tr = await getTranscript(result.element)
+        if (!tr) {
+            console.warn(
+                `Server ${SERVER_ID}: Transcript ${result.element} no longer exists, can't resume it`,
+            )
+            continue
+        } else if (tr.transcription || tr.errCount) {
+            console.warn(
+                `Server ${SERVER_ID}: Transcript ${tr.id} has been transcribed, not resuming it`,
+            )
+            continue
+        }
+        console.log(
+            `Server ${SERVER_ID}: Resuming transcription ${tr.id} for conversation ${tr.conversationId}`,
+        )
+        await startLocalTranscript(tr)
+    }
 }
 
 export async function startTranscription(

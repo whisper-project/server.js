@@ -49,11 +49,13 @@ const debug = release.post('/test/transcript', asyncWrapper(postTranscript))
 function main() {
     console.log(`Starting server ${SERVER_ID}...`)
     // first thing we do is to start picking up suspended transcriptions
-    const transcriber = resumeTranscriptions()
+    resumeTranscriptions().then(() =>
+        console.log(`Server ${SERVER_ID} has stopped resuming transcriptions`),
+    )
     // then we run the appropriate webserver, cleaning up on signals and crashes
     let server: Server | undefined
-    process.once('SIGTERM', () => shutdown('SIGTERM', transcriber, server))
-    process.once('SIGINT', () => shutdown('SIGINT', transcriber, server))
+    process.once('SIGTERM', () => shutdown('SIGTERM', server))
+    process.once('SIGINT', () => shutdown('SIGINT', server))
     try {
         if (process.env.NODE_ENV === 'production') {
             server = release.listen(PORT, () =>
@@ -65,17 +67,18 @@ function main() {
             )
         }
     } catch (err) {
-        shutdown(`error: ${err}`, transcriber, server)
+        shutdown(`error: ${err}`, server)
     }
 }
 
-function shutdown(signal: string, transcriber: Promise<void>, server: Server | undefined) {
+function shutdown(signal: string, server: Server | undefined) {
     let exitStatus = 0
     console.warn(`Shutting down Server ${SERVER_ID} due to ${signal}...`)
-    const suspend = suspendTranscriptions(transcriber)
+    const suspend = suspendTranscriptions()
     const notifyAndExit = () => {
         console.log(`Terminating Server ${SERVER_ID} after shutdown`)
-        process.exit(exitStatus)
+        // give the transcriber a half-second to put back any last transcript it picked up
+        setTimeout(() => process.exit(exitStatus), 500)
     }
     if (server) {
         server.close((err) => {

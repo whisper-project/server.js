@@ -43,15 +43,15 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
             return
         }
         const cccKey = dbKeyPrefix + `ccc:${clientId}|${conversationId}|${body.contentId}`
-        const existing = await rc.set(cccKey, 'whisper', { EX: 48 * 3600, GET: true })
+        let existing = await rc.set(cccKey, 'no-transcript', { EX: 48 * 3600, GET: true })
         if (existing === null) {
             // this is the first time we've been asked to authenticate this conversation.
             // the expiration causes the key to be garbage collected
             // once the conversation is over (not being authenticated)
             console.log(
                 `Whisperer ${body.profileId} (${body.username}) ` +
-                    `is starting conversation ${conversationId} (${body.conversationName}) ` +
-                    `from client ${clientId}`,
+                `is starting conversation ${conversationId} (${body.conversationName}) ` +
+                `from client ${clientId}`,
             )
             const info: ConversationInfo = {
                 id: conversationId,
@@ -78,19 +78,22 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
             }
             if (body?.transcribe === 'yes') {
                 const trId = await startTranscription(clientId, conversationId, body.contentId)
-                // remember transcript against this profile and client
+                // remember transcript against this session, profile, and client
+                existing = trId
+                await rc.set(cccKey, trId, { EX: 48 * 3600, GET: true })
                 await rc.set(cptKey, trId)
                 await rc.set(cetKey, trId)
             } else {
                 // there is no transcription against this profile or client
+                existing = 'no-transcript'
                 await rc.del(cptKey)
                 await rc.del(cetKey)
             }
         } else {
             console.log(
                 `Renewing authentication: Whisperer ${body.profileId} (${body.username}) ` +
-                    `for conversation ${conversationId} (${body.conversationName}) ` +
-                    `from client ${clientId}`,
+                `for conversation ${conversationId} (${body.conversationName}) ` +
+                `from client ${clientId}`,
             )
         }
         const tokenRequest = await createAblyPublishTokenRequest(
@@ -98,7 +101,11 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
             conversationId,
             body.contentId,
         )
-        res.status(200).send({ status: 'success', tokenRequest: JSON.stringify(tokenRequest) })
+        res.status(200).send({
+            status: 'success',
+            tokenRequest: JSON.stringify(tokenRequest),
+            transcriptId: existing,
+        })
     } else if (activity.toLowerCase() == 'subscribe') {
         const ccKey = dbKeyPrefix + `ccc:${clientId}|${conversationId}`
         const existing = await rc.set(ccKey, 'listen', { EX: 3660, GET: true })
@@ -106,15 +113,15 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
             const profile = await getProfileData(body.profileId)
             console.log(
                 `Listener ${body.profileId} (${profile?.name}) ` +
-                    `is looking for conversation ${conversationId} (${body.conversationName}) ` +
-                    `from client ${clientId}`,
+                `is looking for conversation ${conversationId} (${body.conversationName}) ` +
+                `from client ${clientId}`,
             )
         } else {
             const profile = await getProfileData(body.profileId)
             console.log(
                 `Renewing authentication: Listener ${body.profileId} (${profile?.name}) ` +
-                    `to listen to conversation ${conversationId} (${body.conversationName}) ` +
-                    `from client ${clientId}`,
+                `to listen to conversation ${conversationId} (${body.conversationName}) ` +
+                `from client ${clientId}`,
             )
         }
         const tokenRequest = await createAblySubscribeTokenRequest(clientId, conversationId)
@@ -185,7 +192,7 @@ export async function listenTokenRequest(req: express.Request, res: express.Resp
     }
     console.log(
         `Listen token request from web client ${clientId} (${clientName}) ` +
-            `to conversation ${conversationId} (${conversationName})`,
+        `to conversation ${conversationId} (${conversationName})`,
     )
     const tokenRequest = await createAblySubscribeTokenRequest(clientId, conversationId)
     res.status(200).send(tokenRequest)
@@ -230,13 +237,13 @@ export async function postConversation(req: express.Request, res: express.Respon
     if (existing) {
         console.info(
             `Updated conversation ${info.id} (${info.name}) ` +
-                `for user ${info.ownerId} (${body.ownerName}) posted from client ${clientId}`,
+            `for user ${info.ownerId} (${body.ownerName}) posted from client ${clientId}`,
         )
         res.status(204).send()
     } else {
         console.log(
             `New conversation ${info.id} (${info.name}) ` +
-                `for user ${info.ownerId} (${body.ownerName}) posted from client ${clientId}`,
+            `for user ${info.ownerId} (${body.ownerName}) posted from client ${clientId}`,
         )
         res.status(201).send()
     }

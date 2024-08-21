@@ -18,7 +18,12 @@ import '@fontsource/roboto/400.css'
 import '@fontsource/roboto/500.css'
 import '@fontsource/roboto/700.css'
 // @ts-ignore
-import { controlOffsetValue, parseContentChunk, parsePresenceChunk } from '../../back-end/src/protocol.js'
+import {
+    controlOffsetValue,
+    parseContentChunk,
+    parseControlChunk,
+    parsePresenceChunk,
+} from '../../back-end/src/protocol.js'
 
 const conversationId = Cookies.get('conversationId') || ''
 const conversationName = Cookies.get('conversationName') || ''
@@ -26,6 +31,7 @@ const whispererName = Cookies.get('whispererName') || ''
 const clientId = Cookies.get('clientId') || ''
 let clientName = Cookies.get('clientName') || ''
 const logPresenceChunks = Cookies.get('logPresenceChunks') || ''
+let transcriptLink: string = ''
 
 if (!conversationId || !whispererName || !clientId || !conversationName) {
     window.location.href = '/subscribe404.html'
@@ -132,6 +138,8 @@ function DisconnectedView(props: { message: string }) {
             <Typography>
                 You can close this window or <a href={window.location.href}>click here to listen again</a>.
             </Typography>
+            {transcriptLink && <Typography>A transcript of the conversation is available
+                <a href={transcriptLink} target={'_blank'}>at this link</a>.</Typography>}
         </Stack>
     )
 }
@@ -274,6 +282,15 @@ function receiveControlChunk(message: Ably.Types.Message,
     const info = parsePresenceChunk(message.data)
     if (info) {
         logPresenceChunk('received', message.data)
+    } else {
+        const other = parseControlChunk(message.data)
+        if (!other || other.offset != 'transcriptId') {
+            console.error(`Received unexpected control packet: ${message.data}`)
+            return
+        }
+        console.log(`Received transcript id ${other.text}`)
+        transcriptLink = `/transcript/${conversationId}/${other.text}`
+        window.open(transcriptLink, '_blank')
     }
     switch (info?.offset) {
         case 'dropping':

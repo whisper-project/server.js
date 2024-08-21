@@ -138,17 +138,19 @@ function DisconnectedView(props: { message: string }) {
             <Typography>
                 You can close this window or <a href={window.location.href}>click here to listen again</a>.
             </Typography>
-            {transcriptLink && <Typography>A transcript of the conversation is available
-                <a href={transcriptLink} target={'_blank'}>at this link</a>.</Typography>}
+            {transcriptLink &&
+                <Typography>A transcript of the conversation is available <a
+                    href={transcriptLink} target={'_blank'}>at this link</a>.</Typography>}
         </Stack>
     )
 }
 
 function ConnectView(props: { exit: (msg: string) => void }) {
     const [status, setStatus] = useState('waiting')
+    const [transcript, setTranscript] = useState(false)
     const { channel }: ChannelResult = useChannel(
         `${conversationId}:control`,
-        m => receiveControlChunk(m, channel, setStatus, props.exit))
+        m => receiveControlChunk(m, channel, setStatus, setTranscript, props.exit))
     const { updateStatus } = usePresence(`${conversationId}:control`, 'connect')
     hookUnload(() => {
         updateStatus('dropping')
@@ -162,7 +164,7 @@ function ConnectView(props: { exit: (msg: string) => void }) {
     return (
         <Stack spacing={5}>
             <Typography variant="h4">Conversation “{conversationName}” with {whispererName}</Typography>
-            <StatusView status={status} exit={exit} />
+            <StatusView status={status} transcript={transcript} exit={exit} />
             {status.match(/^[A-Za-z0-9-]{36}$/) &&
                 <ConversationView contentId={status} reread={rereadLiveText} />
             }
@@ -170,7 +172,7 @@ function ConnectView(props: { exit: (msg: string) => void }) {
     )
 }
 
-function StatusView(props: { status: string, exit: (msg: string) => void }) {
+function StatusView(props: { status: string, transcript: boolean, exit: (msg: string) => void }) {
     let message: string
     const disconnect = () => props.exit('user-initiated-disconnect')
     switch (props.status) {
@@ -208,6 +210,11 @@ function StatusView(props: { status: string, exit: (msg: string) => void }) {
                     Leave Conversation
                 </Button>
             </Grid>
+            {props.transcript &&
+                <Grid item>
+                    <Typography><a href={transcriptLink} target={'_blank'}>Transcript available</a></Typography>
+                </Grid>
+            }
         </Grid>
     )
 }
@@ -272,6 +279,7 @@ function sendControlChunk(channel: Ably.Types.RealtimeChannelPromise, id: string
 function receiveControlChunk(message: Ably.Types.Message,
                              channel: Ably.Types.RealtimeChannelPromise,
                              setStatus: React.Dispatch<React.SetStateAction<string>>,
+                             setTranscript: React.Dispatch<React.SetStateAction<boolean>>,
                              exit: (msg: string) => void) {
     const me = clientId.toUpperCase()
     const topic = message.name.toUpperCase()
@@ -290,7 +298,7 @@ function receiveControlChunk(message: Ably.Types.Message,
         }
         console.log(`Received transcript id ${other.text}`)
         transcriptLink = `/transcript/${conversationId}/${other.text}`
-        window.open(transcriptLink, '_blank')
+        setTranscript(true)
     }
     switch (info?.offset) {
         case 'dropping':

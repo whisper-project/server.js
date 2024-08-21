@@ -212,23 +212,6 @@ function StatusView(props: { status: string, transcript: boolean, exit: (msg: st
                     </Button>
                 </Grid>
             </Grid>
-            <Grid container component="form" noValidate autoComplete="off">
-                <Grid item>
-                    <TextField
-                        id="outlined-basic"
-                        label="Connection Status"
-                        variant="outlined"
-                        style={{ width: '50ch' }}
-                        value={message}
-                        disabled
-                    />
-                </Grid>
-                <Grid item alignItems="stretch" style={{ display: 'flex' }}>
-                    <Button variant="contained" onClick={disconnect}>
-                        Leave Conversation
-                    </Button>
-                </Grid>
-            </Grid>
             {props.transcript &&
                 <Typography><a href={transcriptLink} target={'_blank'}>Transcript available</a></Typography>
             }

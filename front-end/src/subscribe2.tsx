@@ -191,12 +191,13 @@ function StatusView(props: {
     const toggleTyping = () => {
         if (props.typing) {
             props.setTyping(false)
-            Cookies.set('playTyping', 'NO')
+            playTyping = 'NO'
             stopTyping()
         } else {
             props.setTyping(true)
-            Cookies.set('playTyping', 'YES')
+            playTyping = 'YES'
         }
+        Cookies.set('playTyping', playTyping)
     }
     switch (props.status) {
         case 'waiting':

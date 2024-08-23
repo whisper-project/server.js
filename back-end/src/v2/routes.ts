@@ -176,6 +176,7 @@ export async function listenToConversation(req: express.Request, res: express.Re
     setCookie('clientId', clientId)
     setCookie('clientName', req.cookies?.clientName || '')
     setCookie('logPresenceChunks', (await getPresenceLogging()) ? 'yes' : '')
+    setCookie('playTyping', req.cookies?.playTyping || 'YES')
     const body = subscribeResponse(info!.name, profileData!.name!)
     res.status(200).send(body)
 }

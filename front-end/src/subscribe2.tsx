@@ -17,13 +17,14 @@ import '@fontsource/roboto/300.css'
 import '@fontsource/roboto/400.css'
 import '@fontsource/roboto/500.css'
 import '@fontsource/roboto/700.css'
-// @ts-ignore
 import {
     controlOffsetValue,
     parseContentChunk,
     parseControlChunk,
     parsePresenceChunk,
-} from '../../back-end/src/protocol.js'
+}
+// @ts-ignore
+    from '../../back-end/src/protocol.js'
 
 const conversationId = Cookies.get('conversationId') || ''
 const conversationName = Cookies.get('conversationName') || ''
@@ -31,6 +32,7 @@ const whispererName = Cookies.get('whispererName') || ''
 const clientId = Cookies.get('clientId') || ''
 let clientName = Cookies.get('clientName') || ''
 const logPresenceChunks = Cookies.get('logPresenceChunks') || ''
+let playTyping = Cookies.get('playTyping') || 'YES'
 let transcriptLink: string = ''
 
 if (!conversationId || !whispererName || !clientId || !conversationName) {
@@ -38,6 +40,7 @@ if (!conversationId || !whispererName || !clientId || !conversationName) {
 }
 
 const player = new Audio()
+const typer = new Audio()
 
 const client = new Ably.Realtime.Promise({
     clientId: clientId,
@@ -129,6 +132,7 @@ function NameView(props: { confirm: (msg: string) => void }) {
 }
 
 function DisconnectedView(props: { message: string }) {
+    stopTyping()
     console.log('Waiting a second to drain messages, then closing client')
     setTimeout(() => client.close(), 1000)
     return (
@@ -147,7 +151,9 @@ function DisconnectedView(props: { message: string }) {
 
 function ConnectView(props: { exit: (msg: string) => void }) {
     const [status, setStatus] = useState('waiting')
+    const [typing, setTyping] = useState(playTyping === 'YES')
     const [transcript, setTranscript] = useState(false)
+    // @ts-ignore
     const { channel }: ChannelResult = useChannel(
         `${conversationId}:control`,
         m => receiveControlChunk(m, channel, setStatus, setTranscript, props.exit))
@@ -164,7 +170,7 @@ function ConnectView(props: { exit: (msg: string) => void }) {
     return (
         <Stack spacing={5}>
             <Typography variant="h4">Conversation “{conversationName}” with {whispererName}</Typography>
-            <StatusView status={status} transcript={transcript} exit={exit} />
+            <StatusView status={status} transcript={transcript} typing={typing} setTyping={setTyping} exit={exit} />
             {status.match(/^[A-Za-z0-9-]{36}$/) &&
                 <ConversationView contentId={status} reread={rereadLiveText} />
             }
@@ -172,9 +178,25 @@ function ConnectView(props: { exit: (msg: string) => void }) {
     )
 }
 
-function StatusView(props: { status: string, transcript: boolean, exit: (msg: string) => void }) {
+function StatusView(props: {
+    status: string,
+    transcript: boolean,
+    typing: boolean,
+    setTyping: React.Dispatch<React.SetStateAction<boolean>>,
+    exit: (msg: string) => void
+}) {
     let message: string
+    let connected: boolean = false
     const disconnect = () => props.exit('user-initiated-disconnect')
+    const toggleTyping = () => {
+        if (props.typing) {
+            props.setTyping(false)
+            Cookies.set('playTyping', 'NO')
+        } else {
+            props.setTyping(true)
+            Cookies.set('playTyping', 'YES')
+        }
+    }
     switch (props.status) {
         case 'waiting':
             message = `Waiting for ${whispererName} to join...`
@@ -185,6 +207,7 @@ function StatusView(props: { status: string, transcript: boolean, exit: (msg: st
         default:
             if (props.status.match(/^[A-Za-z0-9-]{36}$/)) {
                 message = 'Connected and listening...'
+                connected = true
             } else {
                 message = `Something has gone wrong (invalid status ${props.status}).`
                 setTimeout(
@@ -212,8 +235,21 @@ function StatusView(props: { status: string, transcript: boolean, exit: (msg: st
                     </Button>
                 </Grid>
             </Grid>
-            {props.transcript &&
-                <Typography><a href={transcriptLink} target={'_blank'}>Transcript available</a></Typography>
+            {connected &&
+                <Grid container component="form" noValidate autoComplete="off">
+                    <Grid item alignItems="stretch" style={{ display: 'flex' }}>
+                        <Button variant="contained" onClick={toggleTyping}>
+                            {props.typing ? 'Don\'t Play Typing Sounds' : 'Play Typing Sounds'}
+                        </Button>
+                    </Grid>
+                    {props.transcript &&
+                        <Grid item alignItems="stretch" style={{ display: 'flex' }}>
+                            <Button variant="contained" href={transcriptLink} target={'_blank'}>
+                                Open Transcript
+                            </Button>
+                        </Grid>
+                    }
+                </Grid>
             }
         </>
     )
@@ -362,15 +398,19 @@ function receiveContentChunk(message: Ably.Types.Message,
     }
     if (chunk.offset === 'playSound') {
         player.src = `/snd/${chunk.text}.mp3`
-        player.play()
+        player.play().then()
     } else if (chunk.isDiff) {
         // sometimes we lose the end of resets, so if we get a diff assume it's completed.
         resetInProgress = false
         if (chunk.offset === 0) {
             updateText((text: Text) => {
+                if (text.live.length == 0) {
+                    startTyping()
+                }
                 return { live: chunk.text, past: text.past }
             })
         } else if (chunk.offset === 'newline') {
+            endTyping()
             console.log('Appending live text to past text')
             updateText((text: Text) => {
                 return { live: '', past: text.past + '\n' + text.live }
@@ -400,6 +440,9 @@ function receiveContentChunk(message: Ably.Types.Message,
         } else if (chunk.offset === 'liveText') {
             console.log('Receive live text chunk, update is over')
             resetInProgress = false
+            if (chunk.text.length > 0) {
+                startTyping()
+            }
             updateText((text: Text) => {
                 return { live: chunk.text, past: text.past }
             })
@@ -444,6 +487,22 @@ function sendRereadText(channel: Ably.Types.RealtimeChannelPromise) {
     // request the whisperer to send all the text
     let chunk = `${controlOffsetValue('requestReread')}|live`
     sendControlChunk(channel, 'whisperer', chunk)
+}
+
+function startTyping() {
+    typer.pause()
+    typer.src = `/snd/typewriter-two-minutes.mp3`
+    typer.play().then()
+}
+
+function endTyping() {
+    typer.pause()
+    typer.src = `/snd/typewriter-carriage-return.mp3`
+    typer.play().then()
+}
+
+function stopTyping() {
+    typer.pause()
 }
 
 function logPresenceChunk(sentOrReceived: string, chunk: string) {

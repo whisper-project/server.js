@@ -192,6 +192,7 @@ function StatusView(props: {
         if (props.typing) {
             props.setTyping(false)
             Cookies.set('playTyping', 'NO')
+            stopTyping()
         } else {
             props.setTyping(true)
             Cookies.set('playTyping', 'YES')
@@ -404,13 +405,17 @@ function receiveContentChunk(message: Ably.Types.Message,
         resetInProgress = false
         if (chunk.offset === 0) {
             updateText((text: Text) => {
-                if (text.live.length == 0) {
-                    startTyping()
+                if (text.live.length == 0 && chunk.text.length > 0) {
+                    // these are the first live characters received
+                    maybeStartTyping()
+                } else if (text.live.length > 0 && chunk.text.length == 0) {
+                    // the live characters have been erased
+                    stopTyping()
                 }
                 return { live: chunk.text, past: text.past }
             })
         } else if (chunk.offset === 'newline') {
-            endTyping()
+            maybeEndTyping()
             console.log('Appending live text to past text')
             updateText((text: Text) => {
                 return { live: '', past: text.past + '\n' + text.live }
@@ -441,7 +446,7 @@ function receiveContentChunk(message: Ably.Types.Message,
             console.log('Receive live text chunk, update is over')
             resetInProgress = false
             if (chunk.text.length > 0) {
-                startTyping()
+                maybeStartTyping()
             }
             updateText((text: Text) => {
                 return { live: chunk.text, past: text.past }
@@ -489,16 +494,20 @@ function sendRereadText(channel: Ably.Types.RealtimeChannelPromise) {
     sendControlChunk(channel, 'whisperer', chunk)
 }
 
-function startTyping() {
-    typer.pause()
-    typer.src = `/snd/typewriter-two-minutes.mp3`
-    typer.play().then()
+function maybeStartTyping() {
+    if (playTyping == 'YES') {
+        typer.pause()
+        typer.src = `/snd/typewriter-two-minutes.mp3`
+        typer.play().then()
+    }
 }
 
-function endTyping() {
+function maybeEndTyping() {
     typer.pause()
-    typer.src = `/snd/typewriter-carriage-return.mp3`
-    typer.play().then()
+    if (playTyping == 'YES') {
+        typer.src = `/snd/typewriter-carriage-return.mp3`
+        typer.play().then()
+    }
 }
 
 function stopTyping() {

@@ -55,6 +55,11 @@ interface Text {
     past: string,
 }
 
+interface Link {
+    host: string,
+    url: string,
+}
+
 export default function ListenerView() {
     const [exitMsg, setExitMsg] = useState('')
     const [listenerName, setListenerName] = useState('')
@@ -259,13 +264,17 @@ function StatusView(props: {
 
 function ConversationView(props: { contentId: string, reread: () => void }) {
     const [text, updateText] = useState({ live: '', past: '' } as Text)
+    const [links, setLinks] = React.useState([] as Link[])
     useChannel(
         `${conversationId}:${props.contentId}`,
-        (m) => receiveContentChunk(m, updateText, props.reread),
+        (m) => receiveContentChunk(m, updateText, setLinks, props.reread),
     )
     doCount(props.reread, 'initialRead', 1)
     return (
-        <LivePastText text={text} />
+        <>
+            <LivePastText text={text} />
+            <WhisperedLinks links={links} />
+        </>
     )
 }
 
@@ -305,6 +314,22 @@ function LivePastText(props: { text: Text }) {
                 onCopy={disableCopy}
                 onCut={disableCut}
             />
+        </>
+    )
+}
+
+function WhisperedLinks(props: { links: Link[] }) {
+    let items = props.links.map((value, index) =>
+        <li key={index}><a href={value.url} target={'_blank'}>{value.host}</a></li>,
+    )
+    return (
+        <>
+            {items.length > 0 &&
+                <>
+                    <Typography>Here are the links typed by the Whisperer, in order:
+                        <ol>{items}</ol></Typography>
+                </>
+            }
         </>
     )
 }
@@ -386,6 +411,7 @@ let resetInProgress = false
 
 function receiveContentChunk(message: Ably.Types.Message,
                              updateText: React.Dispatch<React.SetStateAction<Text>>,
+                             updateLinks: React.Dispatch<React.SetStateAction<Link[]>>,
                              reread: () => void) {
     const me = clientId.toUpperCase()
     const topic = message.name.toUpperCase()
@@ -418,9 +444,12 @@ function receiveContentChunk(message: Ably.Types.Message,
         } else if (chunk.offset === 'newline') {
             maybeEndTyping()
             console.log('Appending live text to past text')
+            let links: Link[] = []
             updateText((text: Text) => {
+                links = getLinks(text.live)
                 return { live: '', past: text.past + '\n' + text.live }
             })
+            updateLinks(old => old.concat(links))
         } else {
             const offset = chunk.offset as number
             updateText((text: Text): Text => {
@@ -513,6 +542,26 @@ function maybeEndTyping() {
 
 function stopTyping() {
     typer.pause()
+}
+
+function getLinks(text: string) {
+    const re1 = /\b([a-z][\w-]+:)?(\/\/+)?([a-z0-9-]+(.[a-z0-9-]+)+)(\/+\S*)?\b/gi
+    const re2 = /^[a-z][\w-]+:/
+    const result = text.match(re1)
+    const urls: Link[] = []
+    if (result != null) {
+        for (let match of result) {
+            let fullUrl = match.match(re2) != null ? match : `https:${match}`
+            try {
+                let url = new URL(fullUrl)
+                let host = url.host
+                urls.push({ host, url: url.href })
+            } catch (e) {
+                console.warn(`Ignoring matched non-url: ${match}`)
+            }
+        }
+    }
+    return urls
 }
 
 function logPresenceChunk(sentOrReceived: string, chunk: string) {

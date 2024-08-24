@@ -28,7 +28,6 @@ export async function transcriptResponse(tr: TranscriptData) {
     } else {
         return await transcriptInProgress(tr)
     }
-
 }
 
 async function transcriptInProgress(tr: TranscriptData) {
@@ -74,6 +73,7 @@ async function transcriptInProgress(tr: TranscriptData) {
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto">
     <link rel="stylesheet" href="/css/transcript.css">
     <title>Conversation ${con?.name || 'Unknown Conversation'} in progress</title>
+    <meta http-equiv="refresh" content="120">
 </head>
 <body>
     <div class="transcript">

@@ -78,6 +78,7 @@ export interface TranscriptData {
     clientId: string
     conversationId: string
     contentId: string
+    tzId: string
     startTime: number
     duration?: number
     contentKey: string
@@ -234,8 +235,9 @@ export async function startTranscription(
     clientId: string,
     conversationId: string,
     contentId: string,
+    tzId: string,
 ) {
-    const tr = await createTranscript(clientId, conversationId, contentId)
+    const tr = await createTranscript(clientId, conversationId, contentId, tzId)
     console.log(`Start transcription for conversation ${conversationId} in transcription ${tr.id}`)
     await startLocalTranscript(tr)
     return tr.id
@@ -367,6 +369,7 @@ async function createTranscript(
     clientId: string,
     conversationId: string,
     contentId: string,
+    tzId: string,
     ttl: number | undefined = undefined,
 ) {
     await getDbClient() // required to get the correct dbKeyPrefix
@@ -377,6 +380,7 @@ async function createTranscript(
         clientId,
         conversationId,
         contentId,
+        tzId,
         startTime: Date.now(),
         contentKey: contentKey,
     }
@@ -393,6 +397,9 @@ async function getTranscript(transcriptId: string) {
     const data: { [k: string]: string | number } = await rc.hGetAll(tKey)
     if (!data?.id) {
         return undefined
+    }
+    if (!data?.tzId) {
+        data.tzId = 'America/Los_Angeles'
     }
     if (typeof data?.startTime === 'string') {
         data.startTime = parseInt(data.startTime)
@@ -517,20 +524,30 @@ async function transcribePackets(transcriptId: string, contentKey: string) {
 
 // testing - not exposed in production
 export async function postTranscript(req: express.Request, resp: express.Response) {
-    const text = req.body.text
-    if (!text) {
-        resp.status(400).send('No "text" field in posted JSON data')
+    const tzId = req.body?.tzId
+    if (!tzId) {
+        resp.status(400).send('No "tzId" field in posted JSON data')
     }
     const tr: TranscriptData = {
         id: randomUUID(),
         clientId: randomUUID().toUpperCase(),
         conversationId: randomUUID().toUpperCase(),
         contentId: randomUUID().toUpperCase(),
+        tzId,
         startTime: Date.now(),
-        duration: 320000,
         contentKey: randomUUID(),
-        transcription: text,
-        errCount: 0,
+    }
+    const inProgress = req.body?.inProgress
+    if (typeof inProgress === 'number' && inProgress >= 0) {
+        tr.startTime -= req.body.inProgress * 60000
+    } else {
+        const text = req.body.text
+        if (!text) {
+            resp.status(400).send('No "text" field in posted JSON data')
+        }
+        tr.duration = 320000
+        tr.transcription = text
+        tr.errCount = 0
     }
     const page = await transcriptResponse(tr)
     resp.status(200).send(page)

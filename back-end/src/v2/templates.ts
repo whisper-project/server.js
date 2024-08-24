@@ -33,6 +33,7 @@ export async function transcriptResponse(tr: TranscriptData) {
 async function transcriptInProgress(tr: TranscriptData) {
     const con = await getConversationInfo(tr.conversationId)
     const start: string = Intl.DateTimeFormat('en-US', {
+        timeZone: tr.tzId,
         weekday: 'short',
         month: 'short',
         day: 'numeric',
@@ -42,16 +43,16 @@ async function transcriptInProgress(tr: TranscriptData) {
         minute: '2-digit',
         timeZoneName: 'short',
     }).format(new Date(tr.startTime))
-    const now: string = Intl.DateTimeFormat('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour12: true,
-        hour: 'numeric',
-        minute: '2-digit',
-        timeZoneName: 'short',
-    }).format(new Date())
+    const minutes = Math.floor((Date.now() - tr.startTime) / 60_000) + 1
+    let duration = minutes == 1 ? `1 minute` : `${minutes} minutes`
+    if (minutes > (24 * 60)) {
+        const days = Math.floor(minutes / (24 * 60))
+        const hours = Math.floor((minutes % (24 * 60)) / 60)
+        duration = `${days} dy ${hours} hr`
+    } else if (minutes > 90) {
+        const hours = Math.floor(minutes / 60)
+        duration = `${hours} hr ${minutes % 60} min`
+    }
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -73,13 +74,13 @@ async function transcriptInProgress(tr: TranscriptData) {
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto">
     <link rel="stylesheet" href="/css/transcript.css">
     <title>Conversation ${con?.name || 'Unknown Conversation'} in progress</title>
-    <meta http-equiv="refresh" content="120">
+    <meta http-equiv="refresh" content="60">
 </head>
 <body>
     <div class="transcript">
     <h2>Transcript of ${con?.name || 'Unknown Conversation'}</h2>
     <div class="duration">
-        <p>Started at ${start}, still in progress as of ${now}...</p>
+        <p>Started at ${start}, in progress for ${duration}...</p>
     </div>
     <p>When the conversation session has concluded,
        <a href="javascript:window.location.reload(true)">refresh this page</a>
@@ -93,6 +94,7 @@ async function transcriptPage(tr: TranscriptData) {
     const con = await getConversationInfo(tr.conversationId)
     const minutes = Math.round(tr.duration! / (60 * 1000))
     const start: string = Intl.DateTimeFormat('en-US', {
+        timeZone: tr.tzId,
         weekday: 'short',
         month: 'short',
         day: 'numeric',

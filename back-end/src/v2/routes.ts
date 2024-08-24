@@ -77,7 +77,8 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
                 await ensureTranscriptionEnded(existingClientTranscriptId)
             }
             if (body?.transcribe === 'yes') {
-                const trId = await startTranscription(clientId, conversationId, body.contentId)
+                const tzId = body?.tzId || 'America/Los_Angeles'
+                const trId = await startTranscription(clientId, conversationId, body.contentId, tzId)
                 // remember transcript against this session, profile, and client
                 existing = trId
                 await rc.set(cccKey, trId, { EX: 48 * 3600, GET: true })

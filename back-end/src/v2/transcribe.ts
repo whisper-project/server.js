@@ -238,7 +238,7 @@ export async function startTranscription(
     tzId: string,
 ) {
     const tr = await createTranscript(clientId, conversationId, contentId, tzId)
-    console.log(`Start transcription for conversation ${conversationId} in transcription ${tr.id}`)
+    console.log(`Start transcription for conversation ${conversationId}, timezone ${tzId}, in transcription ${tr.id}`)
     await startLocalTranscript(tr)
     return tr.id
 }

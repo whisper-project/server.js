@@ -407,6 +407,12 @@ async function getTranscript(transcriptId: string) {
     if (typeof data?.duration === 'string') {
         data.duration = parseInt(data.duration)
     }
+    if (typeof data?.errCount === 'string') {
+        data.errCount = parseInt(data.errCount)
+    }
+    if (typeof data?.ttl === 'string') {
+        data.ttl = parseInt(data.ttl)
+    }
     return data as unknown as TranscriptData
 }
 
@@ -419,6 +425,7 @@ async function saveTranscript(tr: TranscriptData) {
         clientId: tr.clientId,
         conversationId: tr.conversationId,
         contentId: tr.contentId,
+        tzId: tr.tzId,
         startTime: tr.startTime.toString(),
         contentKey: tr.contentKey,
     }
@@ -430,6 +437,9 @@ async function saveTranscript(tr: TranscriptData) {
     }
     if (tr?.transcription) {
         newData.transcription = tr.transcription
+    }
+    if (typeof tr?.errCount === 'number') {
+        newData.errCount = tr?.errCount.toString()
     }
     await rc.hSet(tKey, newData)
     await rc.expire(tr.contentKey, ttl)

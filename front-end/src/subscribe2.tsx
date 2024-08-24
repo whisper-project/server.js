@@ -545,12 +545,16 @@ function stopTyping() {
 }
 
 function getLinks(text: string) {
-    const re1 = /\b([a-z][\w-]+:)?(\/\/+)?([a-z0-9-]+(.[a-z0-9-]+)+)(\/+\S*)?\b/gi
+    const re1 = /\b([a-z][\w-]+:)?(\/\/+)?([a-z0-9-]+(\.[a-z0-9-]+)+)(\/+\S*)?/gi
     const re2 = /^[a-z][\w-]+:/
     const result = text.match(re1)
     const urls: Link[] = []
     if (result != null) {
         for (let match of result) {
+            if (match.endsWith('.')) {
+                // remove trailing period - it's probably a sentence terminator
+                match = match.substring(0, match.length - 1)
+            }
             let fullUrl = match.match(re2) != null ? match : `https:${match}`
             try {
                 let url = new URL(fullUrl)

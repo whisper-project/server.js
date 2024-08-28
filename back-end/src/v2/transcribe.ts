@@ -78,6 +78,7 @@ export interface TranscriptData {
     clientId: string
     conversationId: string
     contentId: string
+    tzId: string
     startTime: number
     duration?: number
     contentKey: string
@@ -158,26 +159,25 @@ export async function listTranscripts(req: express.Request, resp: express.Respon
     resp.status(200).send(data)
 }
 
-export async function suspendTranscriptions(transcriber: Promise<void>) {
+export async function suspendTranscriptions() {
     // stop accepting new transcripts
+    console.log(`Server ${SERVER_ID} is no longer available to transcribe`)
     suspendInProgress = true
+    const rc = await getDbClient()
+    const sKey = dbKeyPrefix + globalServerQueueKey
+    await rc.lRem(sKey, 0, SERVER_ID)
     await unblockDbClient('blocking')
-    await transcriber
     // if we have no transcripts in progress, we're done
     if (localTranscripts.size == 0) {
         console.log(`Server ${SERVER_ID}: No local transcripts to suspend`)
         return
     }
     console.log(`Server ${SERVER_ID}: Looking for another server to resume our transcripts...`)
-    const rc = await getDbClient('blocking')
-    const sKey = dbKeyPrefix + globalServerQueueKey
-    const result = await rc.blMove(sKey, sKey, 'RIGHT', 'LEFT', 15)
+    const result = await rc.blMove(sKey, sKey, 'RIGHT', 'LEFT', 20)
     if (result !== null) {
         console.log(`Server ${SERVER_ID}: Found Server ${result} to resume our transcripts`)
     } else {
-        console.warn(
-            `Server ${SERVER_ID}: No server available to resume our transcripts, suspending anyway`,
-        )
+        console.warn(`Server ${SERVER_ID}: No server available to resume our transcripts`)
     }
     console.log(`Server ${SERVER_ID}: Suspending ${localTranscripts.size} local transcripts...`)
     const promises: Promise<void>[] = []
@@ -202,38 +202,43 @@ export async function resumeTranscriptions() {
     rc.lPush(sKey, SERVER_ID)
     // pick up any waiting transcripts
     const tKey = dbKeyPrefix + globalTranscriptQueueKey
-    do {
-        const result = await rc.brPop(tKey, 0)
-        if (result !== null) {
-            const tr = await getTranscript(result.element)
-            if (!tr) {
-                console.warn(
-                    `Server ${SERVER_ID}: Transcript ${result.element} no longer exists, can't resume it`,
-                )
-                continue
-            } else if (tr.transcription || tr.errCount) {
-                console.warn(
-                    `Server ${SERVER_ID}: Transcript ${tr.id} has been transcribed, not resuming it`,
-                )
-                continue
-            }
-            console.log(
-                `Server ${SERVER_ID}: Resuming transcription ${tr.id} for conversation ${tr.conversationId}`,
-            )
-            await startLocalTranscript(tr)
+    while (!suspendInProgress) {
+        const result = await rc.brPop(tKey, 10)
+        if (result === null) {
+            continue
         }
-    } while (!suspendInProgress)
-    console.log(`Server ${SERVER_ID} is no longer available to transcribe`)
-    await rc.lRem(sKey, 0, SERVER_ID)
+        if (suspendInProgress) {
+            // we got a transcript request just as we were exiting
+            await rc.lPush(tKey, result.element)
+            continue
+        }
+        const tr = await getTranscript(result.element)
+        if (!tr) {
+            console.warn(
+                `Server ${SERVER_ID}: Transcript ${result.element} no longer exists, can't resume it`,
+            )
+            continue
+        } else if (tr.transcription || tr.errCount) {
+            console.warn(
+                `Server ${SERVER_ID}: Transcript ${tr.id} has been transcribed, not resuming it`,
+            )
+            continue
+        }
+        console.log(
+            `Server ${SERVER_ID}: Resuming transcription ${tr.id} for conversation ${tr.conversationId}`,
+        )
+        await startLocalTranscript(tr)
+    }
 }
 
 export async function startTranscription(
     clientId: string,
     conversationId: string,
     contentId: string,
+    tzId: string,
 ) {
-    const tr = await createTranscript(clientId, conversationId, contentId)
-    console.log(`Start transcription for conversation ${conversationId} in transcription ${tr.id}`)
+    const tr = await createTranscript(clientId, conversationId, contentId, tzId)
+    console.log(`Start transcription for conversation ${conversationId}, timezone ${tzId}, in transcription ${tr.id}`)
     await startLocalTranscript(tr)
     return tr.id
 }
@@ -364,6 +369,7 @@ async function createTranscript(
     clientId: string,
     conversationId: string,
     contentId: string,
+    tzId: string,
     ttl: number | undefined = undefined,
 ) {
     await getDbClient() // required to get the correct dbKeyPrefix
@@ -374,6 +380,7 @@ async function createTranscript(
         clientId,
         conversationId,
         contentId,
+        tzId,
         startTime: Date.now(),
         contentKey: contentKey,
     }
@@ -391,11 +398,20 @@ async function getTranscript(transcriptId: string) {
     if (!data?.id) {
         return undefined
     }
+    if (!data?.tzId) {
+        data.tzId = 'America/Los_Angeles'
+    }
     if (typeof data?.startTime === 'string') {
         data.startTime = parseInt(data.startTime)
     }
     if (typeof data?.duration === 'string') {
         data.duration = parseInt(data.duration)
+    }
+    if (typeof data?.errCount === 'string') {
+        data.errCount = parseInt(data.errCount)
+    }
+    if (typeof data?.ttl === 'string') {
+        data.ttl = parseInt(data.ttl)
     }
     return data as unknown as TranscriptData
 }
@@ -409,6 +425,7 @@ async function saveTranscript(tr: TranscriptData) {
         clientId: tr.clientId,
         conversationId: tr.conversationId,
         contentId: tr.contentId,
+        tzId: tr.tzId,
         startTime: tr.startTime.toString(),
         contentKey: tr.contentKey,
     }
@@ -420,6 +437,9 @@ async function saveTranscript(tr: TranscriptData) {
     }
     if (tr?.transcription) {
         newData.transcription = tr.transcription
+    }
+    if (typeof tr?.errCount === 'number') {
+        newData.errCount = tr?.errCount.toString()
     }
     await rc.hSet(tKey, newData)
     await rc.expire(tr.contentKey, ttl)
@@ -514,20 +534,30 @@ async function transcribePackets(transcriptId: string, contentKey: string) {
 
 // testing - not exposed in production
 export async function postTranscript(req: express.Request, resp: express.Response) {
-    const text = req.body.text
-    if (!text) {
-        resp.status(400).send('No "text" field in posted JSON data')
+    const tzId = req.body?.tzId
+    if (!tzId) {
+        resp.status(400).send('No "tzId" field in posted JSON data')
     }
     const tr: TranscriptData = {
         id: randomUUID(),
         clientId: randomUUID().toUpperCase(),
         conversationId: randomUUID().toUpperCase(),
         contentId: randomUUID().toUpperCase(),
+        tzId,
         startTime: Date.now(),
-        duration: 320000,
         contentKey: randomUUID(),
-        transcription: text,
-        errCount: 0,
+    }
+    const inProgress = req.body?.inProgress
+    if (typeof inProgress === 'number' && inProgress >= 0) {
+        tr.startTime -= req.body.inProgress * 60000
+    } else {
+        const text = req.body.text
+        if (!text) {
+            resp.status(400).send('No "text" field in posted JSON data')
+        }
+        tr.duration = 320000
+        tr.transcription = text
+        tr.errCount = 0
     }
     const page = await transcriptResponse(tr)
     resp.status(200).send(page)

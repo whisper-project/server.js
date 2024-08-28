@@ -32,6 +32,8 @@ function parseControlOffset(offset: string): string | undefined {
             return 'restart'
         case '-40':
             return 'requestReread'
+        case '-50':
+            return 'transcriptId'
         default:
             return undefined
     }
@@ -57,9 +59,23 @@ export function controlOffsetValue(offset: string): string | undefined {
             return '-27'
         case 'requestReread':
             return '-40'
+        case 'transcriptId':
+            return '-50'
         default:
             return undefined
     }
+}
+
+export function parseControlChunk(chunk: string) {
+    const parts = chunk.split('|', 2)
+    if (parts.length < 2) {
+        return undefined
+    }
+    const offset = parseControlOffset(parts[0])
+    if (!offset) {
+        return undefined
+    }
+    return { offset, text: String(parts[1]) }
 }
 
 export function parsePresenceChunk(chunk: string) {

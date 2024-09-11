@@ -71,9 +71,8 @@ async function testApns() {
     }
     const response1 = await fetch('http://localhost:2197/apns', { method: 'POST', json: body })
     const response2 = await fetch('http://localhost:2197/apns', { method: 'POST', json: body })
-    assert(response1.status === 204, `Non-204 status from post of APNS token`)
-    assert(response2.status === 204, `Non-204 status from post of APNS token`)
-    assert(response2.headers.get('X-Received-Earlier'), `Second call wasn't caught as a duplicate`)
+    assert(response1.status === 201, `Non-201 status from first post of APNS token: ${response1.status}`)
+    assert(response2.status === 204, `Non-204 (non-duplicate) status from second post of APNS token: ${response2.status}`)
     await new Promise((resolve) => setTimeout(resolve, 1000))
     clientData = await getClientData(clientId)
     assert(clientData && clientData.pushId, `pushId wasn't recorded on client during update`)

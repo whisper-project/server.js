@@ -117,6 +117,9 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
                 `is looking for conversation ${conversationId} (${body.conversationName}) ` +
                 `from client ${clientId}`,
             )
+            // update the last-used date on the profile
+            const update: ProfileData = { id: body.profileId }
+            await saveProfileData(update)
         } else {
             const profile = await getProfileData(body.profileId)
             console.log(
@@ -207,6 +210,16 @@ export async function postUsername(req: express.Request, res: express.Response) 
         console.log(`Missing key in username POST body from ${clientId}: ${JSON.stringify(body)}`)
         res.status(400).send({ status: 'error', reason: 'Invalid username POST data' })
         return
+    }
+    if (body?.password) {
+        console.error(`Non-empty password in username update from ${clientId}: ${JSON.stringify(body)}`)
+    } else {
+        const existing = await getProfileData(body.id)
+        if (existing && existing?.password) {
+            console.error(`Username update received for shared profile: ${existing.id} from client ${clientId}`)
+            res.status(403).send({ status: 'error', reason: `Can't update username on shared profile` })
+            return
+        }
     }
     const update: ProfileData = { id: body.id, name: body.name }
     await saveProfileData(update)

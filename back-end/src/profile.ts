@@ -7,6 +7,7 @@ import { getClientData } from './client.js'
 
 export interface ProfileData {
     id: string
+    lastUsed?: number
     name?: string
     password?: string
     whisperTimestamp?: string
@@ -27,19 +28,17 @@ export async function getProfileData(id: string) {
     if (!dbData?.id) {
         return undefined
     }
-    if (dbData?.settingsVersion) {
-        return {
-            ...dbData,
-            id: id,
-            settingsVersion: parseInt(dbData.settingsVersion) || 1,
-        } as ProfileData
-    } else {
-        return { ...dbData, id: id } as ProfileData
-    }
+    return {
+        ...dbData,
+        id: id,
+        lastUsed: parseInt(dbData?.lastUsed ? dbData.lastUsed : Date.now().toString()),
+        settingsVersion: parseInt(dbData?.settingsVersion ? dbData.settingsVersion : "1"),
+    } as ProfileData
 }
 
 export async function saveProfileData(profileData: ProfileData) {
     const rc = await getDbClient()
+    profileData.lastUsed = Date.now()
     const profileKey = dbKeyPrefix + `pro:${profileData.id}`
     await rc.hSet(profileKey, { ...profileData })
 }

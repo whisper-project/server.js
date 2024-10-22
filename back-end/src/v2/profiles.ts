@@ -53,8 +53,8 @@ export async function userProfilePut(req: express.Request, res: express.Response
     console.log(
         `Successful PUT of user profile ${profileId} (${body.name}) from client ${clientId}`,
     )
-    existingData.name = body.name
-    await saveProfileData(existingData)
+    const update: ProfileData = { id: profileId, name: body.username }
+    await saveProfileData(update)
     res.status(204).send()
 }
 

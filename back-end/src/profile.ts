@@ -31,7 +31,7 @@ export async function getProfileData(id: string) {
     return {
         ...dbData,
         id: id,
-        lastUsed: parseInt(dbData?.lastUsed ? dbData.lastUsed : Date.now().toString()),
+        lastUsed: parseInt(dbData?.lastUsed ? dbData.lastUsed : "0"),
         settingsVersion: parseInt(dbData?.settingsVersion ? dbData.settingsVersion : "1"),
     } as ProfileData
 }

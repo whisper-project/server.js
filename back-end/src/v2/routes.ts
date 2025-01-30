@@ -61,20 +61,14 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
             await setConversationInfo(info)
             const update: ProfileData = { id: body.profileId, name: body.username }
             await saveProfileData(update)
-            // make sure any existing transcript for this profile or client is terminated,
-            // in case the user crashed their app without stopping the transcript.
-            const cptKey = dbKeyPrefix + `cpt:${body.profileId}`
-            const existingProfileTranscriptId = await rc.get(cptKey)
-            const cetKey = dbKeyPrefix + `cet:${clientId}`
-            if (existingProfileTranscriptId !== null) {
-                await ensureTranscriptionEnded(existingProfileTranscriptId)
-            }
-            const existingClientTranscriptId = await rc.get(cetKey)
-            if (
-                existingClientTranscriptId !== null &&
-                existingClientTranscriptId !== existingProfileTranscriptId
-            ) {
-                await ensureTranscriptionEnded(existingClientTranscriptId)
+            // make sure any existing transcript for this profile, client, and conversation
+            // is terminated. Since the cccKey doesn't exist, the existing transcript must
+            // have been for a different contentId, and thus a different instance of the
+            // conversation.
+            const cpcKey = dbKeyPrefix + `cpc:${clientId}|${body.profileId}|${conversationId}`
+            const existingTranscriptId = await rc.get(cpcKey)
+            if (existingTranscriptId !== null) {
+                await ensureTranscriptionEnded(existingTranscriptId)
             }
             if (body?.transcribe === 'yes') {
                 const tzId = body?.tzId || 'America/Los_Angeles'
@@ -82,13 +76,11 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
                 // remember transcript against this session, profile, and client
                 existing = trId
                 await rc.set(cccKey, trId, { EX: 48 * 3600, GET: true })
-                await rc.set(cptKey, trId)
-                await rc.set(cetKey, trId)
+                await rc.set(cpcKey, trId)
             } else {
                 // there is no transcription against this profile or client
                 existing = 'no-transcript'
-                await rc.del(cptKey)
-                await rc.del(cetKey)
+                await rc.del(cpcKey)
             }
         } else {
             console.log(

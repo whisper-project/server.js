@@ -6,8 +6,8 @@
   "license": "AGPL v3",
   "type": "module",
   "engines": {
-    "node": "20.x",
-    "npm": "10.x"
+    "node": "22.x",
+    "npm": "11.x"
   },
   "main": "dist/server.js",
   "scripts": {

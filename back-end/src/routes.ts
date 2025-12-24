@@ -88,8 +88,13 @@ export async function logPresenceChunk(req: express.Request, res: express.Respon
 }
 
 export async function logAnomaly(req: express.Request, res: express.Response) {
-    const { clientId, kind, message } = req.body
-    console.log(`Client ${clientId} reports ${kind} anomaly: ${message}`)
+    const { clientId, kind, level, message } = req.body
+    switch (level) {
+        case 'error': console.error(`Client ${clientId} reports ${kind} error: ${message}`); break;
+        case 'warning': console.warn(`Client ${clientId} reports ${kind} warning: ${message}`); break;
+        case 'info': console.info(`Client ${clientId} reports ${kind} event: ${message}`); break;
+        default: console.log(`Client ${clientId} reports ${kind} anomaly: ${message}`);
+    }
     res.status(204).send()
 }
 

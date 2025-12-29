@@ -73,7 +73,7 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
             if (body?.transcribe === 'yes') {
                 const tzId = body?.tzId || 'America/Los_Angeles'
                 const trId = await startTranscription(clientId, conversationId, body.contentId, tzId)
-                // remember transcript against this session, profile, and client
+                // remember transcription against this session, profile, and client
                 existing = trId
                 await rc.set(cccKey, trId, { EX: 48 * 3600, GET: true })
                 await rc.set(cpcKey, trId)
@@ -84,8 +84,8 @@ export async function pubSubTokenRequest(req: express.Request, res: express.Resp
             }
         } else {
             console.log(
-                `Renewing authentication: Whisperer ${body.profileId} (${body.username}) ` +
-                `for conversation ${conversationId} (${body.conversationName}) ` +
+                `Whisperer ${body.profileId} (${body.username}) ` +
+                `is continuing conversation ${conversationId} (${body.conversationName}) ` +
                 `from client ${clientId}`,
             )
         }

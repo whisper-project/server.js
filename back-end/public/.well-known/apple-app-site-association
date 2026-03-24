@@ -1,29 +1,28 @@
 {
   "applinks": {
-      "details": [
-           {
-             "appIDs": [ "9BJ65G9LZ5.io.clickonetwo.whisper" ],
-             "components": [
-               {
-                  "/": "/subscribe/*",
-                  "comment": "Link to a network-published whisperer (v1)."
-               },
-               {
-                  "/": "/listen/index*.*",
-                  "exclude": true,
-                  "comment": "Web listener source file."
-               },
-               {
-                  "/": "/listen/*",
-                  "comment": "Link to a network-published whisperer (v2)."
-               },
-               {
-                  "/": "/web/*",
-                  "exclude": true,
-                  "comment": "View link on the web."
-               },
-             ]
-           }
-       ]
-   }
+    "details": [
+      {
+        "appIDs": [
+          "P7YF26GARW.io.clickonetwo.whisper",
+          "9BJ65G9LZ5.io.clickonetwo.whisper"
+        ],
+        "components": [
+          {
+            "/": "/listen/index*.*",
+            "comment": "Web listener source file.",
+            "exclude": true
+          },
+          {
+            "/": "/listen/*",
+            "comment": "Link to a network-published whisperer (v2)."
+          },
+          {
+            "/": "/web/*",
+            "comment": "View link on the web.",
+            "exclude": true
+          }
+        ]
+      }
+    ]
+  }
 }

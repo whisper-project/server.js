@@ -300,11 +300,11 @@ async function subscribeTranscriptControl(tr: TranscriptData, ably: Ably.Realtim
             const info = parsePresenceChunk(message.data)
             if (info && info.clientId == tr.clientId && info.offset === 'dropping') {
                 console.log(
-                    `Whisperer has dropped from ${tr.conversationId} with transcription ${tr.id}`,
+                    `Whisperer ${info.clientId} has dropped from conversation ${tr.conversationId} with transcription ${tr.id}`,
                 )
                 if (!subscribed) {
                     // already stopped transcribing
-                    console.warn(`Received duplicate drop message from Whisperer: ${message}`)
+                    console.warn(`Received duplicate drop message from Whisperer ${info.clientId}: ${message}`)
                     return
                 }
                 subscribed = false

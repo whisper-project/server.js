@@ -1,4 +1,4 @@
-module github.com/wp/whisper.server
+module github.com/whisper-project/whisper.server
 
 go 1.26.1
 

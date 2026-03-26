@@ -16,6 +16,7 @@ var (
 	projectPrefix = ""
 	clientUrl     string
 	client        *redis.Client
+	localDb       *redis.Client
 	keyPrefix     string
 )
 
@@ -32,4 +33,15 @@ func GetDb() (*redis.Client, string) {
 	client = redis.NewClient(opts)
 	keyPrefix = projectPrefix + config.DbKeyPrefix
 	return client, keyPrefix
+}
+
+func GetLocalDb() *redis.Client {
+	if localDb == nil {
+		localDb = redis.NewClient(&redis.Options{
+			Addr:     "localhost:6379",
+			Password: "",
+			DB:       0,
+		})
+	}
+	return localDb
 }

@@ -20,10 +20,9 @@ var (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "whisper.server2",
-	Short: "whisper.server2 is the next generation Whisper server",
-	Long: `whisper.server2, the next generation Whisper server,
-provides back-end services used by the next release of Whisper clients.`,
+	Use:   "whisper.server",
+	Short: "whisper.server is the original Whisper server.",
+	Long:  `whisper.server is the original Whisper server.`,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

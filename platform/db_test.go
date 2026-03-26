@@ -7,6 +7,7 @@
 package platform
 
 import (
+	"context"
 	"strings"
 	"testing"
 )
@@ -21,5 +22,13 @@ func TestGetDb(t *testing.T) {
 	db0, prefix := GetDb()
 	if !strings.HasSuffix(prefix, ":"+env.Name[0:1]+":") {
 		t.Errorf("Test environment %q has an invalid database prefix: %q", db0, prefix)
+	}
+}
+
+func TestGetLocalDb(t *testing.T) {
+	ctx := context.Background()
+	db := GetLocalDb()
+	if err := db.Info(ctx, "server").Err(); err != nil {
+		t.Errorf("Failed to get local redis info: %v", err)
 	}
 }
